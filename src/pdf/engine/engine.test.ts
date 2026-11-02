@@ -5,8 +5,11 @@ import * as mupdf from "mupdf";
 import { beforeAll, describe, expect, it } from "vitest";
 import { shownText } from "./content";
 import { PdfEditor } from "./editor";
+import { withHangulTracking } from "./faces";
+import { fitQuadsToGlyphs, pageGlyphs } from "./glyphs";
 import { makeFaces, type FontKit } from "./fonts";
-import { locateAppFreeTexts, normalAppearance } from "./freetext";
+import { appearanceStream, layoutText, locateAppFreeTexts, normalAppearance } from "./freetext";
+import { HANGUL_TRACKING } from "./layout";
 import { newHighlightId, type Quad, type RGB, type TextBox, type TextBoxInput } from "./model";
 import { createSubsetter } from "./subset";
 import { parseToUnicode } from "./tounicode";
@@ -400,5 +403,90 @@ describe("highlights", () => {
     expect(ed.putHighlight({ ...h!, color: CYAN }).highlight.objNum).toBe(h!.objNum);
     expect(ed.deleteHighlight(h!.id)).toBe(0);
     expect(ed.highlights()).toEqual([]);
+  });
+});
+
+describe("Hangul letter spacing", () => {
+  const BOX: TextBoxInput = { page: 0, x: 56, y: 200, text: "한글 자간 ABC 123\n둘째 줄 ㄱㄴ", size: 20, weight: "regular", color: [0, 0, 0], tracking: HANGUL_TRACKING };
+
+  it("tightens only Hangul glyphs, in the layout and the appearance stream", () => {
+    const face = kit.faces.regular;
+    const plain = layoutText("가나 AB", face, 20);
+    const tight = layoutText("가나 AB", face, 20, HANGUL_TRACKING);
+    const delta = Math.round(HANGUL_TRACKING * face.ttf.unitsPerEm);
+    expect(tight.trackDelta).toBe(delta);
+    expect(tight.lines[0]!.tracked).toEqual([true, true, false, false, false]);
+    expect(tight.lines[0]!.width).toBeCloseTo(plain.lines[0]!.width + (2 * delta * 20) / face.ttf.unitsPerEm, 6);
+    expect(layoutText("ABC 123", face, 20, HANGUL_TRACKING).lines[0]!.width).toBe(layoutText("ABC 123", face, 20).lines[0]!.width);
+    // TJ: an adjustment after each Hangul glyph only (plain lines keep Tj)
+    const ap = appearanceStream(layoutText("가A나\nAB", face, 20, HANGUL_TRACKING), face, 20, [0, 0, 0]);
+    const adj = String(Math.round((-delta / face.ttf.unitsPerEm) * 1000 * 1e4) / 1e4);
+    const g = (ch: string) => face.ttf.cmap.get(ch.codePointAt(0)!)!.toString(16).toUpperCase().padStart(4, "0");
+    expect(ap).toContain(`[<${g("가")}> ${adj} <${g("A")}${g("나")}> ${adj}] TJ`);
+    expect(ap).toContain(`<${g("A")}${g("B")}> Tj`);
+  });
+
+  it("gives the overlay font the same advances", () => {
+    const face = kit.faces.regular;
+    const t = parseTTF(withHangulTracking(face, HANGUL_TRACKING));
+    const gid = (ch: string) => face.ttf.cmap.get(ch.codePointAt(0)!)!;
+    const delta = Math.round(HANGUL_TRACKING * face.ttf.unitsPerEm);
+    expect(t.advance(gid("한"))).toBe(face.ttf.advance(gid("한")) + delta);
+    expect(t.advance(gid("ㄱ"))).toBe(face.ttf.advance(gid("ㄱ")) + delta);
+    expect(t.advance(gid("A"))).toBe(face.ttf.advance(gid("A")));
+    expect(t.advance(gid("1"))).toBe(face.ttf.advance(gid("1")));
+  });
+
+  it("stores the spacing with the box; text extraction is unchanged", async () => {
+    const ed = open(fixture());
+    const { box } = await ed.putTextBox(BOX);
+    const doc = new mupdf.PDFDocument((await ed.save()).bytes);
+    const [read] = new PdfEditor(doc, loadKit).textBoxes();
+    expect(read!.tracking).toBe(HANGUL_TRACKING);
+    const annot = locateAppFreeTexts(doc)[0]!.annot;
+    expect(annot.get("TypenoteTracking").asNumber()).toBeCloseTo(HANGUL_TRACKING, 6);
+    const page = doc.loadPage(0);
+    const text = page.getAnnotations()[0]!.toDisplayList().toStructuredText("preserve-whitespace").asText().replace(/\n+$/, "");
+    expect(text).toBe(BOX.text);
+    // a box without spacing (older files) drops the key and reads back without it
+    const ed2 = new PdfEditor(doc, loadKit);
+    await ed2.putTextBox({ ...box, tracking: undefined });
+    const [plain] = new PdfEditor(new mupdf.PDFDocument((await ed2.save()).bytes), loadKit).textBoxes();
+    expect(plain!.tracking).toBeUndefined();
+  });
+});
+
+describe("highlights fitted to the letters", () => {
+  /** the first text line's quad on a page, as the highlight tool selects it */
+  function firstLine(doc: mupdf.PDFDocument, page: number): Quad {
+    const st = doc.loadPage(page).toStructuredText("preserve-whitespace");
+    let box: mupdf.Rect | null = null;
+    st.walk({ beginLine: (b) => void (box ??= b) });
+    const [x0, y0, x1, y1] = box!;
+    const vertical = x1 - x0 < y1 - y0;
+    const from: mupdf.Point = vertical ? [(x0 + x1) / 2, y0 + 0.5] : [x0 + 0.5, (y0 + y1) / 2];
+    const to: mupdf.Point = vertical ? [(x0 + x1) / 2, y1 - 0.5] : [x1 - 0.5, (y0 + y1) / 2];
+    return (st.highlight(from, to) as Quad[])[0]!;
+  }
+  const len = (ax: number, ay: number, bx: number, by: number) => Math.hypot(bx - ax, by - ay);
+
+  it("shrinks the quad across the text to the glyph outlines, on upright and rotated pages", () => {
+    const doc = new mupdf.PDFDocument(fixture());
+    for (const page of [0, 1, 2]) {
+      const q = firstLine(doc, page);
+      const [f] = fitQuadsToGlyphs([q], pageGlyphs(doc.loadPage(page)));
+      // same length along the text, shorter across it ("Base page text": cap height + descender of 12pt Helvetica)
+      expect(len(f![0], f![1], f![2], f![3])).toBeCloseTo(len(q[0], q[1], q[2], q[3]), 6);
+      const across = len(f![0], f![1], f![4], f![5]);
+      expect(across).toBeLessThan(len(q[0], q[1], q[4], q[5]) - 1);
+      expect(across).toBeGreaterThan(10);
+      expect(across).toBeLessThan(12.5);
+    }
+  });
+
+  it("leaves a quad with no glyphs in it alone", () => {
+    const doc = new mupdf.PDFDocument(fixture());
+    const empty: Quad = [100, 300, 200, 300, 100, 330, 200, 330];
+    expect(fitQuadsToGlyphs([empty], pageGlyphs(doc.loadPage(0)))).toEqual([empty]);
   });
 });

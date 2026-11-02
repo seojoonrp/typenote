@@ -8,7 +8,9 @@
   - 크기: pt 직접 입력 + 프리셋 10/12/14/18/24
   - 굵기: Pretendard Regular / SemiBold
   - 색: 프리셋 + picker
+- 한글만 자간 −3% (영문, 숫자, 기호는 그대로). 새로 만들거나 다시 편집한 상자에 적용되고, 그 전에 만든 상자는 편집할 때까지 원래 자간 유지 (Phase 5 이후 피드백)
 - 더블클릭 재편집, 드래그 이동, Delete 삭제. 빈 상자는 확정 시 자동 삭제
+- 텍스트 도구에서 상자를 클릭하면 클릭한 위치에 커서가 놓이고, 편집 중에도 글자를 클릭하면 그 위치로 커서가 옮겨짐. 상자의 윤곽선에 마우스를 올리면 이동 커서가 되고 끌어서 옮길 수 있음 (Phase 5 이후 피드백)
 - 선택한 상자 위에 floating 속성 바 (크기 stepper, B 토글, 색). 선택된 상자가 없을 때 바꾸면 도구 기본값이 됨
 
 **하이라이트 — Acrobat과 동일하게**
@@ -18,10 +20,15 @@
 - 글자가 없는 곳이나 스캔본에서는 동작 안 함
 - 기존 하이라이트 클릭 → 팝오버(색 스와치, 불투명도, 삭제). Delete 키로도 삭제
 - 표시: 색 + Multiply blend (글자가 검정 그대로 보이도록). 불투명도는 슬라이더로 10~100%, 10% 단위, 기본 40%. 모양은 줄마다 평평한 직사각형. 기본 색은 청록 (Phase 4에서 결정)
+- 높이는 그 줄에서 선택한 글자의 외곽선에 딱 맞춤 (글꼴의 줄 높이만큼 위아래로 칠하지 않음. Phase 5 이후 피드백)
 
 **공통**
-- 열기: 대화상자, drag&drop, 최근 파일, .pdf 연결 프로그램 등록. 앱이 켜져 있을 때 연결 프로그램이나 명령줄로 연 PDF는 새 창에서 열림. 그 파일을 이미 연 창이 있으면 그 창을 앞으로 가져오고, 문서가 없는 창이 있으면 그 창에서 엶 (Phase 5에서 결정)
+- 열기: 대화상자, drag&drop, 최근 파일, .pdf 연결 프로그램 등록. 창은 하나이고 문서마다 탭 하나 (Acrobat처럼). 어떤 방법으로 열든 새 탭에서 열리고, 이미 열린 파일이면 그 탭으로 이동. 앱이 켜져 있을 때 연결 프로그램이나 명령줄로 연 PDF도 그 창의 새 탭 (Phase 5 이후 피드백으로 "파일마다 창 하나"에서 변경)
+- 탭: 닫기 버튼, 가운데 클릭, Ctrl+W로 닫기(저장 후). Ctrl+Tab / Ctrl+Shift+Tab, Ctrl+PageDown / PageUp으로 이동. 탭마다 쪽, 배율, undo 기록을 따로 가짐
+- UI 문구는 영어 (Phase 5 이후 피드백)
 - 보기: 한 쪽씩 보기 (Acrobat 단일 페이지 보기처럼). 쪽 전체가 화면에 들어오는 배율이면 휠·화살표·PageUp/Down으로 쪽 단위로 애니메이션 없이 바로 이동하고, 쪽이 화면보다 길면 그 쪽 안에서 스크롤하다가 끝에서 다음 쪽으로 넘어감 (Phase 1 피드백으로 연속 스크롤에서 변경)
+- 스크롤바: 문서 전체를 나타냄. thumb은 지금 쪽의 위치(쪽이 화면보다 길면 그 안의 위치까지)를 보여 주고, 끌면 쪽을 옮겨 다니며 쪽 번호를 띄우고, 빈 곳을 클릭하면 한 쪽 넘김 (Phase 5 이후 피드백)
+- 쪽 바깥(회색 영역)을 클릭하면 상자와 하이라이트 선택이 풀림
 - 줌: 쪽 맞춤, 폭 맞춤, % 직접 입력, Ctrl+휠, 터치패드 핀치
 - 편집·저장: undo/redo, Ctrl+S, autosave(편집 후 3초 동안 입력이 없으면 원본에 incremental 저장. Phase 2에서 결정), 닫기 전 확인
 - 단축키:
@@ -76,11 +83,14 @@ annot dict: /Type /Annot /Subtype /FreeText /Rect /F 4 /IT /FreeTextTypeWriter
   /DA (/PS 14 Tf r g b rg)  /NM (고정접두사-uuid)  /M  /CreationDate
   /AP << /N Form XObject >>
 
+  /TypenoteTracking -0.03  (한글 자간, em. 없으면 0. Phase 5 이후 피드백)
+
 AP Form XObject: /BBox [0 0 w h], 회전 페이지면 /Matrix에 회전 포함
   /Resources << /Font << /PR → Regular Type0, /PS → SemiBold Type0 >> >>
      (문서 공용 객체, 실제로 쓰인 weight만)
   stream: q BT /PS 14 Tf r g b rg  pad firstBaseline Td  lineHeight TL
           <GID hex> Tj T* <…> Tj ET Q
+          한글이 있는 줄은 [<GID…> 29.7852 <GID…> …] TJ (한글 글리프 뒤마다 자간만큼 당김)
 
 Type0: /BaseFont /XXXXXX+Pretendard-SemiBold /Encoding /Identity-H /ToUnicode CMap
   └ CIDFontType2: /CIDSystemInfo (Adobe, Identity, 0) /CIDToGIDMap /Identity /W (쓰인 CID만)
@@ -99,7 +109,7 @@ subset 전략:
 - 덕분에 기존 상자들의 AP는 수정할 필요가 없음
 
 레이아웃 계산:
-- advance는 hmtx 값 그대로, kerning 없음
+- advance는 hmtx 값 그대로, kerning 없음. 한글 글리프는 여기에 자간(round(tracking × UPM))을 더함
 - lineHeight = (ascender − descender + lineGap) / UPM × size
 - 첫 baseline = h − pad − ascender × size / UPM
 - /Rect: 가로 = 최장 줄 advance + 2·pad, 세로 = 줄 수 × lineHeight + 2·pad
@@ -107,6 +117,7 @@ subset 전략:
 overlay 일치:
 - 같은 TTF를 FontFace API로 weight 400/600 두 개 등록
 - `font-kerning: none`, AP와 같은 line-height 사용
+- 자간이 있는 상자는 한글 글리프의 hmtx advance를 자간만큼 줄인 TTF 사본을 별도 family로 등록해서 씀 (편집용 textarea도 같은 배치가 되도록)
 
 ## Highlight 객체
 - annot dict와 AP를 raw 객체로 직접 씀 (Phase 4에서 결정. 평평한 직사각형 AP를 쓰기로 해서 MuPDF annot API의 AP 생성은 쓰지 않음)
@@ -132,7 +143,9 @@ overlay 일치:
 type RGB = [number, number, number]; // 0–1
 type TextBox = {
   id: string; page: number; x: number; y: number; text: string;
-  size: number; weight: 'regular' | 'semibold'; color: RGB; objNum?: number;
+  size: number; weight: 'regular' | 'semibold'; color: RGB;
+  tracking?: number;  // 한글 자간(em), 없으면 0
+  objNum?: number;
 };
 type Quad = [number, number, number, number, number, number, number, number]; // UL, UR, LL, LR
 type Highlight = {
@@ -151,7 +164,7 @@ Undo/redo는 command 패턴. 각 커맨드가 주석의 직렬화본을 보관.
 | 2 | AP 생성기, 폰트 subset/embed, incremental 저장을 앱 모듈로 이식 |
 | 3 | 텍스트 상자 UI (입력, IME, 이동, 재편집, 속성 바) |
 | 4 | 하이라이트 (선택, 미리보기, 더블클릭, 색 변경, 삭제) |
-| 5 | 기존 주석 import/복구(복구는 하지 않기로 결정), 호환성 테스트, 패키징, 파일마다 창 하나 |
+| 5 | 기존 주석 import/복구(복구는 하지 않기로 결정), 호환성 테스트, 패키징. 이후 피드백: 탭, 영어 UI, 한글 자간, 글자 높이 하이라이트, 문서 스크롤바 |
 
 ## 핵심 리스크
 - MuPDF가 직접 만든 FreeText AP를 렌더나 저장 중에 재생성하는지

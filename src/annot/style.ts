@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { Face } from "../pdf/engine/faces";
 import { PAD, type Layout } from "../pdf/engine/layout";
 import type { RGB, Weight } from "../pdf/engine/model";
-import { FONT_FAMILY } from "./fonts";
+import { familyFor } from "./fonts";
 
 export type BoxStyle = { size: number; weight: Weight; color: RGB };
 
@@ -15,11 +15,11 @@ export const MIN_SIZE = 4;
 export const MAX_SIZE = 200;
 
 export const COLOR_PRESETS: { name: string; color: RGB }[] = [
-  { name: "검정", color: [0, 0, 0] },
-  { name: "파랑", color: [0.05, 0.3, 0.85] },
-  { name: "빨강", color: [0.85, 0.12, 0.12] },
-  { name: "초록", color: [0.1, 0.55, 0.2] },
-  { name: "보라", color: [0.45, 0.15, 0.65] },
+  { name: "Black", color: [0, 0, 0] },
+  { name: "Blue", color: [0.05, 0.3, 0.85] },
+  { name: "Red", color: [0.85, 0.12, 0.12] },
+  { name: "Green", color: [0.1, 0.55, 0.2] },
+  { name: "Purple", color: [0.45, 0.15, 0.65] },
 ];
 
 export const clampSize = (s: number) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(s * 10) / 10));
@@ -57,10 +57,10 @@ export function newBoxOrigin(click: { x: number; y: number }, face: Face, size: 
   return { x: Math.max(0, click.x - PAD), y: Math.max(0, click.y - PAD - lineHeightOf(face, size) / 2) };
 }
 
-/** CSS for text that must line up with the appearance stream: same font, size, line height. */
-export function textCss(layout: Layout, style: BoxStyle, scale: number): CSSProperties {
+/** CSS for text that must line up with the appearance stream: same font, size, line height, letter spacing. */
+export function textCss(layout: Layout, style: BoxStyle & { tracking?: number }, scale: number): CSSProperties {
   return {
-    fontFamily: FONT_FAMILY,
+    fontFamily: familyFor(style.tracking),
     fontWeight: style.weight === "semibold" ? 600 : 400,
     fontSize: `${style.size * scale}px`,
     lineHeight: `${layout.lineHeight * scale}px`,

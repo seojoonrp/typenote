@@ -7,6 +7,8 @@ export type TTF = {
   unitsPerEm: number;
   bbox: [number, number, number, number];
   numGlyphs: number;
+  /** glyphs past this share the last advance in 'hmtx' */
+  numberOfHMetrics: number;
   hhea: { ascender: number; descender: number; lineGap: number };
   os2: {
     weightClass: number;
@@ -79,6 +81,7 @@ export function parseTTF(bytes: Uint8Array): TTF {
     unitsPerEm,
     bbox,
     numGlyphs,
+    numberOfHMetrics,
     hhea: { ascender: i16(hhea + 4), descender: i16(hhea + 6), lineGap: i16(hhea + 8) },
     os2: {
       weightClass: u16(os2 + 4),

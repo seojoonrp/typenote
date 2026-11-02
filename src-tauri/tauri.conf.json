@@ -30,11 +30,11 @@
     "active": true,
     "targets": ["nsis"],
     "publisher": "typenote",
-    "shortDescription": "PDF 타이핑·하이라이트",
+    "shortDescription": "PDF typing and highlighting",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Korean", "English"],
+        "languages": ["English"],
         "displayLanguageSelector": false
       }
     },

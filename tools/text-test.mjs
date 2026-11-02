@@ -98,13 +98,16 @@ const steps = [
   { click: "__box(0)", label: "select box 0" },
   { key: "b", mods: 2, label: "Ctrl+B" },
   { key: ".", mods: 2 | 8, label: "Ctrl+Shift+." },
-  { click: "__el('.attr-bar.floating .swatch[title=\"파랑\"]')", label: "blue swatch" },
+  { click: "__el('.attr-bar.floating .swatch[title=\"Blue\"]')", label: "blue swatch" },
   { wait: 200 },
   st("D1 semibold, 14pt, blue"),
 
-  // E. double-click re-edits the same box
+  // E. double-click re-edits the same box, the caret where it was clicked (__box: the middle of
+  // the box, i.e. inside line 1); Ctrl+End then types at the end
   { click: "__box(0)", count: 2, label: "double-click box 0" },
   { wait: 200 },
+  { label: "caret at the click, not at the end", eval: "(() => { const t = document.querySelector('.tbox-editor'); return [t.selectionStart, t.value.length]; })()" },
+  { key: "End", mods: 2, label: "Ctrl+End" },
   type(" 추가"),
   { key: "Escape" },
   { wait: 200 },

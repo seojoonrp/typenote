@@ -28,14 +28,10 @@ export interface Platform {
   /** Runs before the window closes; returning false keeps it open. Returns an unsubscribe function. */
   onCloseRequested(handler: () => Promise<boolean>): () => void;
   /**
-   * PDFs this window is asked to open: the launch file, and files opened through the file
-   * association while the app runs (one window per file). Returns an unsubscribe function.
+   * PDFs to open as tabs: the launch files, and files opened through the file association
+   * while the app runs. Returns an unsubscribe function.
    */
   onOpenRequest(cb: (path: string) => void): () => void;
-  /** Tells the host which file this window shows, so the file is not opened in two windows. */
-  setOpenPath(path: string | null): void;
-  /** Brings forward another window that shows `path`; false if there is none. */
-  focusWindowShowing(path: string): Promise<boolean>;
   recentFiles(): Promise<string[]>;
   addRecentFile(path: string): Promise<string[]>;
   removeRecentFile(path: string): Promise<string[]>;

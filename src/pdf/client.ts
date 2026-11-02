@@ -42,7 +42,7 @@ export class PdfClient {
     });
     // a worker that fails to load would otherwise leave every call hanging
     this.worker.addEventListener("error", (ev) => {
-      const err = new PdfError("failed", `PDF 엔진 오류: ${ev.message || "worker failed to load"}`);
+      const err = new PdfError("failed", `PDF engine error: ${ev.message || "worker failed to load"}`);
       for (const p of this.pending.values()) p.reject(err);
       this.pending.clear();
     });
@@ -105,5 +105,13 @@ export class PdfClient {
 
   cancel(ids: number[]) {
     if (ids.length) this.worker.postMessage({ kind: "cancel", ids, id: 0 } satisfies Request);
+  }
+
+  /** Ends the worker (its document and memory); pending calls fail. */
+  dispose() {
+    this.worker.terminate();
+    const err = new PdfError("cancelled", "the document was closed");
+    for (const p of this.pending.values()) p.reject(err);
+    this.pending.clear();
   }
 }

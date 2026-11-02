@@ -67,11 +67,22 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `DocStore`는 텍스트 상자와 하이라이트를 **한 undo 스택**에서 다룬다(명령에 `kind`). 선택은 둘 중 하나만 된다(`App.tsx`).
 - 실제 앱 시나리오는 `tools/highlight-test.mjs`, overlay와 AP 비교는 `tools/highlight-compare.mjs`로 돌린다.
 
-## 창, 호환성, 배포 (Phase 5)
-- **파일마다 창 하나.** `tauri-plugin-single-instance`(반드시 첫 번째 플러그인)가 두 번째 실행의 명령줄을 첫 프로세스로 넘긴다. `src-tauri/src/windows.rs`가 창을 고른다: 그 파일을 연 창 → 문서가 없는 창 → 새 창(`doc-N`, main 창 설정 `app.windows[0]`을 복제하므로 `zoomHotkeysEnabled`도 같다). 열 파일은 Rust가 창별로 들고 있다가 프런트가 `launch_path`로 한 번 가져간다(`open-request` 이벤트는 신호만). 프런트는 연 파일을 `set_open_path`로 알리고, 다른 창에 이미 열린 파일은 `focus_window_showing`으로 그 창을 앞으로 가져온다. capability의 windows는 `["main", "doc-*"]`.
-- Windows에서는 이벤트 루프 스레드에서 webview 창을 만들면 멈춘다. 새 창은 별도 스레드에서 만든다.
+## 탭, 호환성, 배포 (Phase 5와 이후 피드백)
+- **창은 하나, 문서마다 탭 하나.** `tauri-plugin-single-instance`(반드시 첫 번째 플러그인)가 두 번째 실행의 명령줄을 첫 프로세스로 넘기면 `src-tauri/src/launch.rs`가 열 파일을 쌓아 두고 main 창에 `open-request` 신호를 보낸다. 프런트는 `launch_paths`로 한 번에 가져가서 순서대로 연다(동시에 열면 탭 순서가 섞인다).
+- 탭은 `src/doc/Tabs.ts`. **탭마다 자기 `PdfClient`(worker)와 `DocStore`**를 가진다. 탭을 닫으면 worker를 terminate해서 WASM 메모리를 돌려받는다. 같은 파일 판별은 `pathKey`(소문자, 역슬래시). 탭은 문서가 열린 뒤에만 목록에 들어간다.
+- `src/App.tsx`는 탭, 열기, 닫기, 창 단축키(Ctrl+O/W/Tab/PageUp/PageDown)만 맡고, 보이는 탭의 화면은 `src/DocumentView.tsx`(key = 탭 id)가 그린다. 탭을 바꾸면 DocumentView가 다시 마운트되므로 탭의 쪽과 배율은 `tab.view`에, 입력 중인 글자는 `tab.flush`(= `tt.commit`)로 넘기기 전에 확정한다. 창 제목은 DocumentView가 정한다(탭의 DocStore host의 `setTitle`은 아무것도 안 함).
+- **dev 빌드는 identifier에 `.dev`를 붙인다**(`main.rs`). 설치된 앱과 single-instance 잠금, settings.json(최근 파일), WebView2 데이터를 공유하지 않게 하기 위해서다. 테스트 도구는 자기가 띄운 프로세스만 종료한다(`taskkill /IM` 금지: 사용자가 쓰는 앱까지 죽는다). release 빌드는 설치된 앱과 identifier가 같으므로, 사용자가 앱을 쓰는 중에는 release exe를 실행하지 않는다.
 - 호환성: `src/pdf/engine/corpus.ts`(파일 구조 변형과 앱의 편집 왕복)를 `compat.test.ts`(단위 테스트)와 `tools/compat-render.ts`(MuPDF, poppler, PDFium, pdf.js 렌더 비교)가 함께 쓴다. MuPDF는 linearize 저장을 더 이상 지원하지 않는다.
-- 배포: `npm run tauri build` → `src-tauri/target/release/bundle/nsis/`의 설치 파일(사용자 단위 설치, 코드 서명 없음). release 빌드에는 dev hook이 없으므로 `tools/release-test.mjs` + `run-app.ps1 -Release`로 DOM과 실제 입력만 써서 확인한다. 창 동작은 `tools/window-test.mjs`(debug 빌드).
+- 배포: `npm run tauri build` → `src-tauri/target/release/bundle/nsis/`의 설치 파일(사용자 단위 설치, 영어, 코드 서명 없음). release 빌드에는 dev hook이 없으므로 `tools/release-test.mjs` + `run-app.ps1 -Release`로 DOM과 실제 입력만 써서 확인한다. 탭 동작은 `tools/tab-test.mjs`(debug 빌드).
+
+## 한글 자간, 하이라이트 높이, 스크롤바 (Phase 5 이후 피드백)
+- **한글 자간**은 상자 속성 `tracking`(em, `layout.ts`의 `HANGUL_TRACKING` = −0.03)이다. annot에 `/TypenoteTracking`으로 저장하고, 없으면 0(그 전에 만든 상자). 새 상자와 다시 편집한 상자가 현재 값을 받는다. 판정은 **글리프 단위**(`Face.hangul`: 한글 코드포인트가 가리키는 GID)다. 일부 글리프는 한글이 아닌 코드포인트와 공유된다.
+  - AP: 한글 글리프 뒤마다 TJ 숫자로 당긴다. `/W`는 공용 폰트 객체라 상자별로 바꿀 수 없으므로 건드리지 않는다.
+  - overlay: 한글 글리프 hmtx advance를 줄인 TTF 사본(`withHangulTracking`)을 별도 family(`familyFor`)로 등록한다. 그래서 textarea도 같은 배치가 된다. 실측 차이는 이전과 같다(`tools/overlay-test.mjs`, 상자 3개가 자간 있음).
+- **하이라이트 높이**: worker의 `selectText`가 `StructuredText` quad를 글리프 외곽선에 맞춰 줄인다(`src/pdf/engine/glyphs.ts`). JS Device로 `runPageContents`를 돌려 글리프마다 `Text.getBounds`를 구하고 쪽별로 캐시한다. MuPDF는 text bounds에 device 단위 1을 더하므로 64배 행렬로 재고 나눈다.
+- **문서 스크롤바**: `src/viewer/DocScrollbar.tsx`. 네이티브 세로 스크롤바는 숨긴다(`::-webkit-scrollbar` width 0, 가로는 그대로). 휠은 `.viewer`에서 받아서 스크롤바 위에서도 쪽을 넘긴다.
+- 쪽 위에 뜨는 막대들은 `useKeepInside`(`src/annot/floating.ts`)로 쪽 안에 들어오게 밀고, `.content`는 `overflow: clip`이라 무엇이 삐져나와도 가로 스크롤이 생기지 않는다.
+- 텍스트 상자: 윤곽선(`.tbox-edge`)은 텍스트 도구에서도 이동 손잡이이고, 상자 안을 클릭하면 `caretIndexAt`로 클릭한 위치에 커서를 놓는다. 편집 중인 textarea에서는 layer의 mousedown preventDefault를 하지 않는다(그래야 클릭으로 커서가 옮겨진다).
 
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키·Enter·Esc 처리 금지.
@@ -92,3 +103,4 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 검사: `npm run typecheck`, `npm test`, `cd src-tauri && cargo test && cargo clippy --all-targets`
 - 배포 빌드: `npm run tauri build` (처음에는 의존 crate 컴파일과 LTO 링크로 약 6분)
 - 렌더 엔진 비교: `cd spike && npx tsx ../tools/compat-render.ts <작업 폴더>` (poppler `pdftoppm` 필요)
+- UI 문구는 영어, 문서(docs/, CLAUDE.md)는 한국어

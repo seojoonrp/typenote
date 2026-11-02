@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Document windows (main and one per file opened while running)",
-  "windows": ["main", "doc-*"],
+  "description": "Main window",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",

@@ -5,11 +5,11 @@ export type HighlightStyle = { color: RGB; opacity: number };
 
 /** cyan = the color used in the user's Acrobat highlights; yellow = Acrobat's usual default */
 export const HIGHLIGHT_COLORS: { name: string; color: RGB }[] = [
-  { name: "청록", color: [0.219604, 0.898041, 1] },
-  { name: "노랑", color: [1, 0.819611, 0] },
-  { name: "연두", color: [0.55, 0.9, 0.35] },
-  { name: "분홍", color: [1, 0.5, 0.75] },
-  { name: "주황", color: [1, 0.65, 0.25] },
+  { name: "Cyan", color: [0.219604, 0.898041, 1] },
+  { name: "Yellow", color: [1, 0.819611, 0] },
+  { name: "Green", color: [0.55, 0.9, 0.35] },
+  { name: "Pink", color: [1, 0.5, 0.75] },
+  { name: "Orange", color: [1, 0.65, 0.25] },
 ];
 
 export const DEFAULT_HIGHLIGHT: HighlightStyle = { color: HIGHLIGHT_COLORS[0]!.color, opacity: 0.4 };

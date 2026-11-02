@@ -53,11 +53,11 @@ export const tauriPlatform: Platform = {
     );
   },
   onOpenRequest(cb) {
-    // the host keeps the file until asked (launch_path), and pings when another one arrives
+    // the host keeps the files until asked (launch_paths), and pings when more arrive
     let active = true;
     const take = () =>
-      void invoke<string | null>("launch_path").then((path) => {
-        if (path && active) cb(path);
+      void invoke<string[]>("launch_paths").then((paths) => {
+        if (active) for (const path of paths) cb(path);
       });
     const stop = subscribe(async () => {
       const unlisten = await getCurrentWebviewWindow().listen("open-request", take);
@@ -69,10 +69,6 @@ export const tauriPlatform: Platform = {
       stop();
     };
   },
-  setOpenPath(path) {
-    void invoke("set_open_path", { path });
-  },
-  focusWindowShowing: (path) => invoke<boolean>("focus_window_showing", { path }),
   recentFiles: () => invoke<string[]>("recent_files"),
   addRecentFile: (path) => invoke<string[]>("add_recent_file", { path }),
   removeRecentFile: (path) => invoke<string[]>("remove_recent_file", { path }),

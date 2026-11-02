@@ -52,7 +52,7 @@ type Item = Items[Kind];
 type Command = { kind: Kind; before: Item | null; after: Item | null; merge?: string; at: number };
 
 type Client = Pick<PdfClient, "open" | "putTextBox" | "deleteTextBox" | "putHighlight" | "deleteHighlight" | "save">;
-type Host = Pick<Platform, "writePdf" | "pickSavePath" | "addRecentFile" | "setTitle">;
+export type DocHost = Pick<Platform, "writePdf" | "pickSavePath" | "addRecentFile" | "setTitle">;
 
 export type SaveOptions = { full?: boolean; saveAs?: boolean; overwrite?: boolean };
 
@@ -80,7 +80,7 @@ export class DocStore {
 
   constructor(
     private client: Client,
-    private host: Host,
+    private host: DocHost,
   ) {}
 
   // --- subscription (useSyncExternalStore) -------------------------------------------------

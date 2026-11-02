@@ -82,7 +82,7 @@ const steps = [
   { click: "__pt(150, 73)", label: "click highlight 1" },
   { wait: 200 },
   st("5a popover shown"),
-  { click: "__el('.hl-layer .attr-bar.floating .swatch[title=\"노랑\"]')", label: "yellow" },
+  { click: "__el('.hl-layer .attr-bar.floating .swatch[title=\"Yellow\"]')", label: "yellow" },
   { label: "opacity 70%", eval: "__setRange('.hl-layer .attr-bar.floating input.opacity', 70)" },
   { wait: 200 },
   st("5b yellow 70%"),

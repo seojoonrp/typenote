@@ -14,7 +14,7 @@ export function ZoomField({ zoom, onCommit, onDone }: Props) {
     return (
       <button
         className="zoom"
-        title="배율 입력"
+        title="Type a zoom level"
         onClick={() => {
           cancelled.current = false;
           setText(String(Math.round(zoom * 100)));
@@ -37,7 +37,7 @@ export function ZoomField({ zoom, onCommit, onDone }: Props) {
       className="zoom"
       autoFocus
       inputMode="decimal"
-      aria-label="배율 (%)"
+      aria-label="Zoom (%)"
       value={text}
       onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => setText(e.currentTarget.value)}

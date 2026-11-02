@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { DocStore } from "../doc/DocStore";
 import type { Faces } from "../pdf/engine/faces";
+import { HANGUL_TRACKING } from "../pdf/engine/layout";
 import { newBoxId, type TextBox } from "../pdf/engine/model";
 import { clampSize, DEFAULT_STYLE, newBoxOrigin, stepSize, type BoxStyle } from "./style";
 
 export type Tool = "select" | "text" | "highlight";
 /** The box being typed into (new or existing), not written to the document until committed. */
-export type Draft = TextBox & { isNew: boolean };
+export type Draft = TextBox & { isNew: boolean; /** where the caret starts (default: the end) */ caret?: number };
 
 /** Marks elements a pointerdown on which does not end typing (the editor, the attribute bars). */
 export const KEEP_DRAFT_ATTR = "data-keep-draft";
@@ -37,7 +38,14 @@ const isEditable = (t: EventTarget | null) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable);
 
 const sameBox = (a: TextBox, b: TextBox) =>
-  a.page === b.page && a.x === b.x && a.y === b.y && a.text === b.text && a.size === b.size && a.weight === b.weight && a.color.every((v, i) => v === b.color[i]);
+  a.page === b.page &&
+  a.x === b.x &&
+  a.y === b.y &&
+  a.text === b.text &&
+  a.size === b.size &&
+  a.weight === b.weight &&
+  (a.tracking ?? 0) === (b.tracking ?? 0) &&
+  a.color.every((v, i) => v === b.color[i]);
 
 export type TextTool = ReturnType<typeof useTextTool>;
 
@@ -68,7 +76,7 @@ export function useTextTool(store: DocStore, faces: Faces | null, page: number) 
     if (!d) return;
     draftRef.current = null;
     setDraftState(null);
-    const { isNew: _isNew, ...box } = d;
+    const { isNew: _isNew, caret: _caret, ...box } = d;
     const existing = find(box.id);
     if (box.text.trim() === "") {
       if (existing) void store.deleteTextBox(box.id);
@@ -85,14 +93,16 @@ export function useTextTool(store: DocStore, faces: Faces | null, page: number) 
     const style = prefs.style;
     const origin = newBoxOrigin(click, faces[style.weight], style.size);
     setSelectedId(null);
-    setDraft({ id: newBoxId(), page: pageIndex, ...origin, text: "", ...style, isNew: true });
+    setDraft({ id: newBoxId(), page: pageIndex, ...origin, text: "", ...style, tracking: HANGUL_TRACKING, isNew: true });
   };
 
-  const beginEdit = (box: TextBox) => {
+  /** Starts typing into a box, the caret at `caret` (a text offset) or at the end. */
+  const beginEdit = (box: TextBox, caret?: number) => {
     if (draftRef.current?.id === box.id) return;
     commit();
     setSelectedId(box.id);
-    setDraft({ ...box, isNew: false });
+    // editing brings an older box to the current letter spacing
+    setDraft({ ...box, tracking: HANGUL_TRACKING, isNew: false, caret });
   };
 
   const setText = (text: string) => {

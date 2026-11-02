@@ -24,9 +24,26 @@ export function appearanceStream(layout: Layout, face: Face, size: number, color
     `${fmt(PAD)} ${fmt(layout.firstBaseline)} Td`,
     `${fmt(layout.lineHeight)} TL`,
   ];
+  // TJ numbers are thousandths of an em, positive pulls the next glyph left
+  const adjust = fmt((-layout.trackDelta / face.ttf.unitsPerEm) * 1000);
   layout.lines.forEach((line, i) => {
     if (i > 0) ops.push("T*");
-    if (line.gids.length) ops.push(`<${line.gids.map(hex4).join("")}> Tj`);
+    if (!line.gids.length) return;
+    if (!line.tracked.includes(true)) {
+      ops.push(`<${line.gids.map(hex4).join("")}> Tj`);
+      return;
+    }
+    const parts: string[] = [];
+    let run = "";
+    line.gids.forEach((gid, k) => {
+      run += hex4(gid);
+      if (line.tracked[k]) {
+        parts.push(`<${run}>`, adjust);
+        run = "";
+      }
+    });
+    if (run) parts.push(`<${run}>`);
+    ops.push(`[${parts.join(" ")}] TJ`);
   });
   ops.push("ET", "Q");
   return ops.join("\n") + "\n";
@@ -112,6 +129,9 @@ export function locateFreeText(doc: mupdf.PDFDocument, id: string): LocatedFreeT
   return locateAppFreeTexts(doc).find((f) => f.annot.get("NM").asString() === id);
 }
 
+/** Private key holding a box's Hangul letter spacing (em), so a re-layout keeps it. */
+const TRACKING_KEY = "TypenoteTracking";
+
 const contentsText = (annot: mupdf.PDFObject) => (annot.get("Contents").isString() ? annot.get("Contents").asString() : "").replace(/\r\n?/g, "\n");
 
 /** All app text boxes, as the UI model. */
@@ -130,6 +150,9 @@ export function readTextBoxes(doc: mupdf.PDFDocument): TextBox[] {
     }
     const r = annot.get("Rect");
     const rect = userRectToPage(ctm, [0, 1, 2, 3].map((k) => r.get(k).asNumber()) as mupdf.Rect);
+    const t = annot.get(TRACKING_KEY);
+    // PDF reals come back as float32
+    const tracking = t.isNumber() ? Math.round(t.asNumber() * 1e4) / 1e4 : 0;
     boxes.push({
       id: annot.get("NM").asString(),
       page,
@@ -139,6 +162,7 @@ export function readTextBoxes(doc: mupdf.PDFDocument): TextBox[] {
       size: da.size,
       weight: da.weight,
       color: da.color,
+      ...(tracking ? { tracking } : {}),
       objNum: annot.asIndirect(),
     });
   }
@@ -178,7 +202,8 @@ export function writeFreeText(
   box: TextBox,
   existing?: mupdf.PDFObject,
 ): { annot: mupdf.PDFObject; missing: string[] } {
-  const layout = layoutText(box.text, face, box.size);
+  const tracking = box.tracking ?? 0;
+  const layout = layoutText(box.text, face, box.size, tracking);
   const page = doc.loadPage(box.page);
   const ctm = page.getTransform();
   const pageObj = page.getObject();
@@ -207,6 +232,8 @@ export function writeFreeText(
     existing.put("M", `(${now})`);
     if (rotation) existing.put("Rotate", rotation);
     else existing.delete("Rotate");
+    if (tracking) existing.put(TRACKING_KEY, tracking);
+    else existing.delete(TRACKING_KEY);
     return { annot: existing, missing: layout.missing };
   }
 
@@ -227,6 +254,7 @@ export function writeFreeText(
     AP: { N: form },
   };
   if (rotation) dict.Rotate = rotation;
+  if (tracking) dict[TRACKING_KEY] = tracking;
   const annot = doc.addObject(dict);
   let annots = pageObj.get("Annots");
   if (annots.isNull()) {

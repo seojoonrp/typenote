@@ -6,6 +6,7 @@ import regularUrl from "../../fonts/Pretendard-Regular.ttf?url";
 import semiboldUrl from "../../fonts/Pretendard-SemiBold.ttf?url";
 import { PdfEditor } from "./engine/editor";
 import { makeFaces, type FontKit } from "./engine/fonts";
+import { fitQuadsToGlyphs, pageGlyphs, type Glyph } from "./engine/glyphs";
 import { NM_PREFIX } from "./engine/model";
 import { createSubsetter } from "./engine/subset";
 import type { Quad } from "./engine/model";
@@ -59,8 +60,9 @@ function dropPages(indexes?: number[]) {
   }
 }
 
-// page text (annotations excluded) for highlight selection, kept until the document is reopened
-type PageText = { st: mupdf.StructuredText; lines: mupdf.Rect[] };
+// page text (annotations excluded) for highlight selection, kept until the document is reopened;
+// the glyph outlines are gathered on the first selection on the page
+type PageText = { st: mupdf.StructuredText; lines: mupdf.Rect[]; glyphs: Glyph[] | null };
 const texts = new Map<number, PageText>();
 
 function pageText(index: number): PageText {
@@ -69,7 +71,7 @@ function pageText(index: number): PageText {
     const st = getPage(index).toStructuredText("preserve-whitespace");
     const lines: mupdf.Rect[] = [];
     st.walk({ beginLine: (bbox) => void lines.push(bbox) });
-    texts.set(index, (t = { st, lines }));
+    texts.set(index, (t = { st, lines, glyphs: null }));
   }
   return t;
 }
@@ -77,16 +79,22 @@ function pageText(index: number): PageText {
 /** pt of slack around a text line in which a press still counts as "on the text" */
 const LINE_SLOP = 1;
 
+/** Line quads of the selection, fitted to the letters' height (no band above and below them). */
 function selectText({ page, from, to, mode }: SelectTextParams): SelectTextResult {
-  const { st, lines } = pageText(page);
+  const t = pageText(page);
   const [x, y] = from;
-  const onText = lines.some((b) => x >= b[0] - LINE_SLOP && x <= b[2] + LINE_SLOP && y >= b[1] - LINE_SLOP && y <= b[3] + LINE_SLOP);
+  const onText = t.lines.some((b) => x >= b[0] - LINE_SLOP && x <= b[2] + LINE_SLOP && y >= b[1] - LINE_SLOP && y <= b[3] + LINE_SLOP);
   if (!onText) return [];
+  let quads: Quad[];
   if (mode === "word") {
-    const q = st.snap(from, from, "words") as Quad;
-    return q[2] - q[0] > 0.1 || q[3] - q[1] > 0.1 ? [q] : [];
+    const q = t.st.snap(from, from, "words") as Quad;
+    quads = q[2] - q[0] > 0.1 || q[3] - q[1] > 0.1 ? [q] : [];
+  } else {
+    quads = t.st.highlight(from, to, 1000) as Quad[];
   }
-  return st.highlight(from, to, 1000) as Quad[];
+  if (quads.length === 0) return quads;
+  t.glyphs ??= pageGlyphs(getPage(page));
+  return fitQuadsToGlyphs(quads, t.glyphs);
 }
 
 function closeDoc() {
@@ -98,7 +106,7 @@ function closeDoc() {
 }
 
 function current(): PdfEditor {
-  if (!editor) throw new SessionError("no-document", "열린 문서가 없습니다.");
+  if (!editor) throw new SessionError("no-document", "No document is open.");
   return editor;
 }
 
@@ -123,12 +131,12 @@ function open(bytes: ArrayBuffer): OpenResult {
   const opened = mupdf.Document.openDocument(new Uint8Array(bytes), "application/pdf");
   if (opened.needsPassword()) {
     opened.destroy();
-    throw new SessionError("needs-password", "암호가 걸린 PDF는 아직 지원하지 않습니다.");
+    throw new SessionError("needs-password", "Password-protected PDFs are not supported.");
   }
   const pdf = opened.asPDF();
   if (!pdf) {
     opened.destroy();
-    throw new SessionError("not-pdf", "PDF 파일이 아닙니다.");
+    throw new SessionError("not-pdf", "This is not a PDF file.");
   }
   editor = new PdfEditor(pdf, loadKit);
   docId++;

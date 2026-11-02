@@ -1,5 +1,6 @@
 // Color swatches, opacity slider and delete for a highlight (or the highlight tool defaults).
 import type { CSSProperties } from "react";
+import { useKeepInside } from "./floating";
 import { HIGHLIGHT_COLORS, type HighlightStyle } from "./highlightStyle";
 import { cssColor, hexToRgb, rgbToHex, sameColor } from "./style";
 
@@ -13,8 +14,9 @@ type Props = {
 
 export function HighlightBar({ value, onChange, onDelete, className, style }: Props) {
   const pct = Math.round(value.opacity * 100);
+  const ref = useKeepInside(style?.left);
   return (
-    <div className={`attr-bar ${className ?? ""}`} style={style} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className={`attr-bar ${className ?? ""}`} style={style} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
       {HIGHLIGHT_COLORS.map((p) => (
         <button
           key={p.name}
@@ -28,8 +30,8 @@ export function HighlightBar({ value, onChange, onDelete, className, style }: Pr
       <input
         type="color"
         className="picker"
-        title="다른 색"
-        aria-label="다른 색"
+        title="Other color"
+        aria-label="Other color"
         value={rgbToHex(value.color)}
         onChange={(e) => onChange({ color: hexToRgb(e.currentTarget.value) }, "color")}
       />
@@ -41,16 +43,16 @@ export function HighlightBar({ value, onChange, onDelete, className, style }: Pr
         max={100}
         step={10}
         value={pct}
-        title="진하기"
-        aria-label="진하기"
+        title="Opacity"
+        aria-label="Opacity"
         onChange={(e) => onChange({ opacity: Number(e.currentTarget.value) / 100 }, "opacity")}
       />
       <span className="opacity-label">{pct}%</span>
       {onDelete && (
         <>
           <span className="sep" />
-          <button onClick={onDelete} title="삭제 (Delete)">
-            삭제
+          <button onClick={onDelete} title="Delete (Del)">
+            Delete
           </button>
         </>
       )}

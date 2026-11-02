@@ -189,7 +189,12 @@ button.primary {
   white-space: nowrap;
 }
 
+/* the one item that gives way when the row is too long (the file name is on the tab) */
 .toolbar .save-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -224,18 +229,82 @@ button.primary {
   border-radius: 6px;
 }
 
+.viewer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 .scroller {
   position: relative;
   flex: 1;
-  /* always-on vertical scrollbar: fit-width can't oscillate as the bar appears/disappears */
-  overflow-x: auto;
-  overflow-y: scroll;
+  min-width: 0;
+  overflow: auto;
   outline: none;
+}
+
+/* no native vertical scrollbar: the document scrollbar beside the pages replaces it (always
+   there, so fit-width can't oscillate as a bar appears and disappears) */
+.scroller::-webkit-scrollbar {
+  width: 0;
+  height: 12px;
+}
+
+.scroller::-webkit-scrollbar-track {
+  background: #f1f2f5;
+}
+
+.scroller::-webkit-scrollbar-thumb {
+  border: 3px solid #f1f2f5;
+  border-radius: 6px;
+  background: #b4b8c2;
+}
+
+.scroller::-webkit-scrollbar-thumb:hover {
+  background: #969cab;
+}
+
+.docbar {
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  background: #f1f2f5;
+  border-left: 1px solid var(--border);
+  user-select: none;
+}
+
+.docbar-thumb {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border-radius: 4px;
+  background: #b4b8c2;
+}
+
+.docbar-thumb:hover,
+.docbar-thumb.dragging {
+  background: #868c99;
+}
+
+.docbar-label {
+  position: absolute;
+  right: 18px;
+  z-index: 5;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(30 32 38 / 0.85);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .content {
   position: relative;
   transform-origin: 0 0;
+  /* bars and notes hanging off the page never widen the scroll area */
+  overflow: clip;
 }
 
 .page {
@@ -287,6 +356,42 @@ button.primary {
 
 .tbox:hover {
   outline: 1px dashed rgb(36 86 214 / 0.5);
+}
+
+/* the outline is a move handle, also in the text tool (where the inside is for typing) */
+.tbox-edge {
+  position: absolute;
+  cursor: move;
+}
+
+.tbox-edge.top,
+.tbox-edge.bottom {
+  left: -4px;
+  right: -4px;
+  height: 7px;
+}
+
+.tbox-edge.left,
+.tbox-edge.right {
+  top: -4px;
+  bottom: -4px;
+  width: 7px;
+}
+
+.tbox-edge.top {
+  top: -4px;
+}
+
+.tbox-edge.bottom {
+  bottom: -4px;
+}
+
+.tbox-edge.left {
+  left: -4px;
+}
+
+.tbox-edge.right {
+  right: -4px;
 }
 
 .tbox.selected {
@@ -444,4 +549,71 @@ button.primary {
   min-width: 34px;
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* tabs: one per open document. Fixed height, like the toolbar: a reflow would re-fit the page */
+.tabbar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 2px;
+  height: 34px;
+  padding: 0 6px;
+  background: #dcdee4;
+  overflow-x: auto;
+  scrollbar-width: none;
+  user-select: none;
+}
+
+.tab {
+  display: flex;
+  flex: 0 1 220px;
+  align-items: center;
+  gap: 4px;
+  min-width: 90px;
+  height: 29px;
+  padding: 0 4px 0 12px;
+  border-radius: 7px 7px 0 0;
+  color: var(--dim);
+  cursor: default;
+}
+
+.tab:hover {
+  background: rgb(255 255 255 / 0.45);
+}
+
+.tab.active {
+  background: var(--bar);
+  color: var(--text);
+}
+
+.tab-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-problem {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.tab-close {
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  line-height: 20px;
+  visibility: hidden;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  visibility: visible;
+}
+
+.tab-close:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.08);
 }

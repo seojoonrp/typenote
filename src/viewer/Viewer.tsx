@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import type { PdfClient } from "../pdf/client";
 import type { DocInfo, HiddenAnnots } from "../pdf/protocol";
+import { DocScrollbar } from "./DocScrollbar";
 import { isPinch } from "./input";
 import { fitPageZoom, fitWidthZoom, PX_PER_PT, pageLayout, type PageLayout } from "./layout";
 import { keyNav, LINE, WheelPager, type Nav } from "./navigation";
@@ -36,12 +37,16 @@ type Props = {
   client: PdfClient;
   doc: DocInfo;
   ref?: Ref<ViewerHandle>;
+  /** page shown first (a tab shown again comes back to its page) */
+  initialPage?: number;
   initialMode: ZoomMode;
   initialZoom: number;
   onPageChange(page: number): void;
   onZoomChange(zoom: number, mode: ZoomMode): void;
   /** drawn over the page bitmap, in page CSS px (page space × scale) */
   overlay?: (view: PageView) => ReactNode;
+  /** a press in the gray area around the page */
+  onOutsidePage?: () => void;
 };
 
 type Anchor = { xPt: number; yPt: number; ax: number; ay: number };
@@ -50,17 +55,21 @@ type Gesture = { startZoom: number; factor: number; ax: number; ay: number; time
 const isEditable = (t: EventTarget | null) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable);
 
-export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChange, onZoomChange, overlay }: Props) {
+export function Viewer({ client, doc, ref, initialPage = 0, initialMode, initialZoom, onPageChange, onZoomChange, overlay, onOutsidePage }: Props) {
+  const viewerRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [dpr, setDpr] = useState(() => window.devicePixelRatio || 1);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(initialPage);
   const [mode, setMode] = useState<ZoomMode>(initialMode);
   const [customZoom, setCustomZoom] = useState(clampZoom(initialZoom));
   const [, setVersion] = useState(0);
   const [epoch, setEpoch] = useState(0);
   const navRef = useRef<"top" | "bottom" | null>(null);
+  /** after a page change from the document scrollbar: how far down the new page to scroll */
+  const seekRef = useRef<number | null>(null);
+  const [scroll, setScroll] = useState({ top: 0, height: 1, client: 1 });
   const anchorRef = useRef<Anchor | null>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const pager = useMemo(() => new WheelPager(), []);
@@ -115,20 +124,35 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
   useEffect(() => onPageChange(current), [current, onPageChange]);
   useEffect(() => onZoomChange(zoom, mode), [zoom, mode, onZoomChange]);
 
+  const measureScroll = useCallback(() => {
+    const el = scrollerRef.current!;
+    setScroll((s) => (s.top === el.scrollTop && s.height === el.scrollHeight && s.client === el.clientHeight ? s : { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight }));
+  }, []);
+  useEffect(() => {
+    const el = scrollerRef.current!;
+    el.addEventListener("scroll", measureScroll, { passive: true });
+    return () => el.removeEventListener("scroll", measureScroll);
+  }, [measureScroll]);
+
   // after a page change or zoom change, restore the scroll position that goes with it
   useLayoutEffect(() => {
     const el = scrollerRef.current!;
     const align = navRef.current;
     const a = anchorRef.current;
+    const seek = seekRef.current;
     navRef.current = null;
     anchorRef.current = null;
-    if (align) {
+    seekRef.current = null;
+    if (seek !== null) {
+      el.scrollTop = seek * el.scrollHeight;
+    } else if (align) {
       el.scrollTop = align === "top" ? 0 : el.scrollHeight;
     } else if (a) {
       el.scrollLeft = layout.left + a.xPt * layout.scale - a.ax;
       el.scrollTop = layout.top + a.yPt * layout.scale - a.ay;
     }
-  }, [layout]);
+    measureScroll();
+  }, [layout, measureScroll]);
 
   const goTo = useCallback(
     (target: number, align: "top" | "bottom") => {
@@ -142,6 +166,21 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
       setPage(t);
     },
     [current, doc.pageCount],
+  );
+
+  /** The document scrollbar: show `target`, scrolled `fraction` of its height down. */
+  const seek = useCallback(
+    (target: number, fraction: number) => {
+      const el = scrollerRef.current!;
+      const t = Math.max(0, Math.min(doc.pageCount - 1, target));
+      if (t === live.current.current) {
+        el.scrollTop = fraction * el.scrollHeight;
+        return;
+      }
+      seekRef.current = fraction;
+      setPage(t);
+    },
+    [doc.pageCount],
   );
 
   const anchorAt = useCallback(
@@ -180,9 +219,11 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
     live.current = { zoom, current, goTo, applyZoom, applyNav, onZoomChange };
   });
 
-  // wheel: Ctrl / pinch zooms; otherwise page-by-page at the page edges
+  // wheel: Ctrl / pinch zooms; otherwise page-by-page at the page edges (also over the
+  // document scrollbar, which sits beside the scroller)
   useEffect(() => {
     const el = scrollerRef.current!;
+    const outer = viewerRef.current!;
     const onWheel = (e: WheelEvent) => {
       const s = live.current;
       if (e.ctrlKey) {
@@ -214,12 +255,18 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
       const dy = e.deltaMode === 1 ? e.deltaY * LINE : e.deltaMode === 2 ? e.deltaY * el.clientHeight : e.deltaY;
       const maxTop = el.scrollHeight - el.clientHeight;
       const r = pager.onWheel(dy, e.timeStamp, el.scrollTop <= 0.5, el.scrollTop >= maxTop - 0.5);
-      if (r === "native") return;
+      if (r === "native") {
+        if (!el.contains(e.target as Node)) {
+          e.preventDefault();
+          el.scrollTop += dy;
+        }
+        return;
+      }
       e.preventDefault();
       if (r !== "swallow") s.goTo(s.current + r, r > 0 ? "top" : "bottom");
     };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    outer.addEventListener("wheel", onWheel, { passive: false });
+    return () => outer.removeEventListener("wheel", onWheel);
   }, [pager]);
 
   // keyboard: arrows, PageUp/PageDown, Home/End, all without scroll animation
@@ -285,13 +332,29 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
   const bmp = cache.best(current, wantScale(current));
 
   return (
-    <div className="scroller" ref={scrollerRef} tabIndex={0}>
-      <div className="content" ref={contentRef} style={{ width: layout.contentWidth, height: layout.contentHeight }}>
-        <div className="page" data-page={current + 1} style={{ top: layout.top, left: layout.left, width: layout.width, height: layout.height }}>
-          <PageCanvas key={current} bitmap={bmp?.bitmap} />
-          {overlay?.({ page: current, scale: layout.scale })}
+    <div className="viewer" ref={viewerRef}>
+      <div
+        className="scroller"
+        ref={scrollerRef}
+        tabIndex={0}
+        onPointerDown={(e) => e.button === 0 && !(e.target as Element).closest(".page") && onOutsidePage?.()}
+      >
+        <div className="content" ref={contentRef} style={{ width: layout.contentWidth, height: layout.contentHeight }}>
+          <div className="page" data-page={current + 1} style={{ top: layout.top, left: layout.left, width: layout.width, height: layout.height }}>
+            <PageCanvas key={current} bitmap={bmp?.bitmap} />
+            {overlay?.({ page: current, scale: layout.scale })}
+          </div>
         </div>
       </div>
+      <DocScrollbar
+        page={current}
+        pageCount={doc.pageCount}
+        top={scroll.top}
+        height={scroll.height}
+        client={scroll.client}
+        onSeek={seek}
+        onFlip={(dir) => goTo(current + dir, "top")}
+      />
     </div>
   );
 }

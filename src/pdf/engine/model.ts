@@ -13,6 +13,8 @@ export type TextBox = {
   size: number;
   weight: Weight;
   color: RGB;
+  /** Hangul letter spacing in em, added after each Hangul glyph (absent = 0, boxes made before it existed) */
+  tracking?: number;
   objNum?: number;
 };
 

@@ -1,8 +1,8 @@
 // HTML overlay for the app's text boxes on the current page: shows them (the base bitmap hides
 // them), selects, drags, and edits in a textarea laid out exactly like the appearance stream.
-import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type Ref } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref } from "react";
 import type { Face, Faces } from "../pdf/engine/faces";
-import { layoutText, missingGlyphs } from "../pdf/engine/layout";
+import { caretIndexAt, layoutText, missingGlyphs } from "../pdf/engine/layout";
 import type { TextBox } from "../pdf/engine/model";
 import type { PageView } from "../viewer/Viewer";
 import { AttributeBar } from "./AttributeBar";
@@ -46,7 +46,15 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
     }
   };
 
-  const onBoxDown = (box: TextBox) => (e: ReactPointerEvent<HTMLDivElement>) => {
+  /** The caret offset in `box`'s text nearest to a point on the page. */
+  const caretAt = (box: TextBox, p: { x: number; y: number }) =>
+    caretIndexAt(layoutText(box.text, faces[box.weight], box.size, box.tracking), faces[box.weight], box.size, p.x - box.x, p.y - box.y);
+
+  /**
+   * Press on a box: select it and drag to move. A click without moving starts typing in the text
+   * tool, with the caret where it was clicked; on the box's edge (`moveOnly`) it only selects.
+   */
+  const onBoxDown = (box: TextBox, moveOnly = false) => (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     tt.select(box.id);
@@ -70,7 +78,7 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
       el.removeEventListener("pointercancel", end);
       setDrag(null);
       if (moved && ev.type === "pointerup") tt.moveTo(box, box.x + delta.dx, box.y + delta.dy);
-      else if (!moved && tt.tool === "text") tt.beginEdit(box);
+      else if (!moved && tt.tool === "text" && !moveOnly) tt.beginEdit(box, caretAt(box, start));
     };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", end);
@@ -78,7 +86,7 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
   };
 
   const barBox: TextBox | null = draft ?? (tt.selected?.page === page && !drag ? tt.selected : null);
-  const barLayout = barBox && layoutText(barBox.text, faces[barBox.weight], barBox.size);
+  const barLayout = barBox && layoutText(barBox.text, faces[barBox.weight], barBox.size, barBox.tracking);
   let barTop = 0;
   if (barBox && barLayout) {
     barTop = barBox.y * scale - BAR_HEIGHT_PX - 6;
@@ -90,8 +98,8 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
       ref={layerRef}
       className={`text-layer tool-${tt.tool}`}
       onPointerDown={onLayerDown}
-      // no focus change or text selection from clicks on the page
-      onMouseDown={(e) => e.preventDefault()}
+      // no focus change or text selection from clicks on the page (the editor places its caret itself)
+      onMouseDown={(e) => !(e.target instanceof HTMLTextAreaElement) && e.preventDefault()}
     >
       {boxes.map((box) =>
         box.id === draft?.id ? null : (
@@ -103,7 +111,8 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
             selected={box.id === tt.selected?.id}
             offset={drag?.id === box.id ? drag : null}
             onPointerDown={onBoxDown(box)}
-            onDoubleClick={() => tt.beginEdit(box)}
+            onEdgeDown={onBoxDown(box, true)}
+            onDoubleClick={(e) => tt.beginEdit(box, caretAt(box, toPage(e.clientX, e.clientY)))}
           />
         ),
       )}
@@ -130,11 +139,15 @@ type BoxViewProps = {
   selected: boolean;
   offset: { dx: number; dy: number } | null;
   onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void;
-  onDoubleClick(): void;
+  /** on the box's outline: move only (in the text tool the inside is for typing) */
+  onEdgeDown(e: ReactPointerEvent<HTMLDivElement>): void;
+  onDoubleClick(e: ReactMouseEvent): void;
 };
 
-function BoxView({ box, face, scale, selected, offset, onPointerDown, onDoubleClick }: BoxViewProps) {
-  const layout = useMemo(() => layoutText(box.text, face, box.size), [box.text, face, box.size]);
+const EDGES = ["top", "right", "bottom", "left"] as const;
+
+function BoxView({ box, face, scale, selected, offset, onPointerDown, onEdgeDown, onDoubleClick }: BoxViewProps) {
+  const layout = useMemo(() => layoutText(box.text, face, box.size, box.tracking), [box.text, face, box.size, box.tracking]);
   return (
     <div
       className={`tbox${selected ? " selected" : ""}`}
@@ -149,10 +162,13 @@ function BoxView({ box, face, scale, selected, offset, onPointerDown, onDoubleCl
       onPointerDown={onPointerDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        onDoubleClick();
+        onDoubleClick(e);
       }}
     >
       {withNotdef(box.text, face)}
+      {EDGES.map((edge) => (
+        <div key={edge} className={`tbox-edge ${edge}`} onPointerDown={onEdgeDown} onDoubleClick={(e) => e.stopPropagation()} />
+      ))}
     </div>
   );
 }
@@ -185,14 +201,15 @@ type EditorProps = {
 
 function BoxEditor({ ref, draft, face, scale, onText, onCommit }: EditorProps) {
   const own = useRef<HTMLTextAreaElement>(null);
-  const layout = layoutText(draft.text, face, draft.size);
+  const layout = layoutText(draft.text, face, draft.size, draft.tracking);
   const missing = missingGlyphs(draft.text, face);
 
   useLayoutEffect(() => {
     const t = own.current!;
     t.focus({ preventScroll: true });
-    t.setSelectionRange(t.value.length, t.value.length);
-  }, [draft.id]);
+    const at = Math.min(draft.caret ?? t.value.length, t.value.length);
+    t.setSelectionRange(at, at);
+  }, [draft.id]); // eslint-disable-line react-hooks/exhaustive-deps -- once per box: the caret moves by itself afterwards
 
   // 1em of extra room so the caret and the character being composed never scroll the field
   const slack = draft.size;
@@ -234,7 +251,7 @@ function BoxEditor({ ref, draft, face, scale, onText, onCommit }: EditorProps) {
       />
       {missing.length > 0 && (
         <div className="glyph-warning" style={{ left: draft.x * scale, top: (draft.y + layout.height) * scale + 4 }}>
-          Pretendard에 없는 글자: {missing.join(" ")} (PDF에는 빈 칸으로 저장됩니다)
+          Not in Pretendard: {missing.join(" ")} (saved as empty boxes in the PDF)
         </div>
       )}
     </>

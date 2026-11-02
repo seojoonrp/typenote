@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import { describe, expect, it } from "vitest";
 import { makeFaces } from "../pdf/engine/faces";
-import { layoutText, PAD } from "../pdf/engine/layout";
+import { caretIndexAt, layoutText, PAD } from "../pdf/engine/layout";
 import { hexToRgb, lineHeightOf, newBoxOrigin, rgbToHex, stepSize } from "./style";
 
 const faces = makeFaces({
@@ -43,5 +43,23 @@ describe("text box style helpers", () => {
     expect(l.lines).toHaveLength(2);
     expect(l.height).toBeCloseTo(2 * l.lineHeight + 2 * PAD);
     expect(l.width).toBeCloseTo(Math.max(l.lines[0]!.width, l.lines[1]!.width) + 2 * PAD);
+  });
+});
+
+describe("caret position from a click", () => {
+  it("picks the line under the point and the nearest character boundary", () => {
+    const f = faces.regular;
+    const text = "가나다 AB\n둘째 줄";
+    const l = layoutText(text, f, 20, -0.03);
+    const w = (s: string) => layoutText(s, f, 20, -0.03).lines[0]!.width;
+    const y1 = PAD + l.lineHeight / 2;
+    const y2 = PAD + l.lineHeight * 1.5;
+    expect(caretIndexAt(l, f, 20, 0, y1)).toBe(0);
+    expect(caretIndexAt(l, f, 20, PAD + w("가") * 0.4, y1)).toBe(0);
+    expect(caretIndexAt(l, f, 20, PAD + w("가") * 0.6, y1)).toBe(1);
+    expect(caretIndexAt(l, f, 20, PAD + w("가나다 A") + 1, y1)).toBe(5);
+    expect(caretIndexAt(l, f, 20, 999, y1)).toBe(6); // past the end of line 1
+    expect(caretIndexAt(l, f, 20, PAD + w("둘") + 1, y2)).toBe(7 + 1); // "가나다 AB\n" is 7 long
+    expect(caretIndexAt(l, f, 20, 0, 999)).toBe(7); // below the last line: its start
   });
 });

@@ -15,7 +15,7 @@ port.addEventListener("message", (ev: MessageEvent<Request>) => {
     session.then(
       (s) => s.handle(msg, reply),
       (e: unknown) => {
-        if (msg.kind !== "cancel") reply({ id: msg.id, ok: false, code: "failed", message: `MuPDF를 불러오지 못했습니다: ${String(e)}` });
+        if (msg.kind !== "cancel") reply({ id: msg.id, ok: false, code: "failed", message: `Could not load MuPDF: ${String(e)}` });
       },
     ),
   );

@@ -10,7 +10,7 @@ declare global {
 }
 
 const RECENT_KEY = "typenote.recent";
-let launchFile = new URLSearchParams(location.search).get("file");
+let launchFiles = new URLSearchParams(location.search).getAll("file");
 
 function loadRecent(): string[] {
   try {
@@ -57,7 +57,7 @@ export const browserPlatform: Platform = {
     return { size: bytes.byteLength, modified: Date.now() };
   },
   async pickSavePath(defaultPath) {
-    return window.prompt("저장할 이름 (브라우저에서는 메모리에만 저장)", defaultPath);
+    return window.prompt("Save as (kept in memory only in the browser)", defaultPath);
   },
   async ask(message) {
     return window.confirm(message);
@@ -66,21 +66,17 @@ export const browserPlatform: Platform = {
     return () => {};
   },
   onOpenRequest(cb) {
-    // ?file= stands in for the launch file, delivered once
+    // ?file= (repeatable) stands in for the launch files, delivered once
     let active = true;
     queueMicrotask(() => {
-      const path = launchFile;
-      if (!active || !path) return;
-      launchFile = null;
-      cb(path);
+      if (!active) return;
+      const paths = launchFiles;
+      launchFiles = [];
+      for (const path of paths) cb(path);
     });
     return () => {
       active = false;
     };
-  },
-  setOpenPath() {},
-  async focusWindowShowing() {
-    return false;
   },
   async recentFiles() {
     return loadRecent();
