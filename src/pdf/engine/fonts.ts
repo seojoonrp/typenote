@@ -1,23 +1,13 @@
-// Pretendard faces and the document-shared Type0/CIDFontType2 font objects.
+// The document-shared Type0/CIDFontType2 font objects for the Pretendard faces.
 import * as mupdf from "mupdf";
-import type { Weight } from "./model";
+import type { Face, Faces } from "./faces";
 import type { Subsetter } from "./subset";
 import { buildToUnicode } from "./tounicode";
-import { parseTTF, type TTF } from "./ttf";
 
-export const RES_NAME: Record<Weight, string> = { regular: "PR", semibold: "PS" };
-export const WEIGHT_OF_RES: Record<string, Weight | undefined> = { PR: "regular", PS: "semibold" };
-
-export type Face = { weight: Weight; resName: string; ttf: TTF; bytes: Uint8Array };
-export type Faces = Record<Weight, Face>;
+export { makeFaces, RES_NAME, WEIGHT_OF_RES, type Face, type Faces } from "./faces";
 
 /** Everything the engine needs from outside: the two TTFs and hb-subset. */
 export type FontKit = { faces: Faces; subsetter: Subsetter };
-
-export function makeFaces(bytes: Record<Weight, Uint8Array>): Faces {
-  const face = (weight: Weight): Face => ({ weight, resName: RES_NAME[weight], ttf: parseTTF(bytes[weight]), bytes: bytes[weight] });
-  return { regular: face("regular"), semibold: face("semibold") };
-}
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const to1000 = (face: Face, v: number) => round3((v * 1000) / face.ttf.unitsPerEm);

@@ -17,9 +17,11 @@ export type RenderParams = {
   scale: number;
   /** lower renders first */
   priority: number;
-  /** hide app-managed FreeText/Highlight (they are drawn by the HTML overlay instead) */
-  hideAppAnnots: boolean;
+  /** annotations drawn by the HTML overlay instead of the base bitmap */
+  hide: HiddenAnnots;
 };
+
+export type HiddenAnnots = { textBoxes: boolean; highlights: boolean };
 
 export type RenderResult = { bitmap: ImageBitmap; width: number; height: number };
 

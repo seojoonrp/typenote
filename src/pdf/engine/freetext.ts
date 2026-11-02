@@ -2,44 +2,11 @@
 // Everything here edits raw PDF objects: never call PDFAnnotation setters + update() on these,
 // MuPDF would replace the appearance stream with its own (Helv/Batang, no Pretendard).
 import * as mupdf from "mupdf";
-import { WEIGHT_OF_RES, type Face } from "./fonts";
+import { WEIGHT_OF_RES, type Face } from "./faces";
+import { layoutText, PAD, splitLines, type Layout } from "./layout";
+
+export { layoutText, PAD, splitLines, type Layout };
 import { NM_PREFIX, type RGB, type TextBox, type Weight } from "./model";
-
-export const PAD = 2;
-
-export type Layout = {
-  lines: { text: string; gids: number[]; width: number }[];
-  width: number;
-  height: number;
-  lineHeight: number;
-  firstBaseline: number;
-  missing: string[];
-};
-
-export function splitLines(text: string): string[] {
-  return text.split(/\r\n|\r|\n/);
-}
-
-export function layoutText(text: string, face: Face, size: number): Layout {
-  const { ttf } = face;
-  const scale = size / ttf.unitsPerEm;
-  const lineHeight = (ttf.hhea.ascender - ttf.hhea.descender + ttf.hhea.lineGap) * scale;
-  const missing: string[] = [];
-  const lines = splitLines(text).map((line) => {
-    const gids: number[] = [];
-    let adv = 0;
-    for (const ch of line) {
-      const gid = ttf.cmap.get(ch.codePointAt(0)!);
-      if (gid === undefined && !missing.includes(ch)) missing.push(ch);
-      gids.push(gid ?? 0);
-      adv += ttf.advance(gid ?? 0);
-    }
-    return { text: line, gids, width: adv * scale };
-  });
-  const width = Math.max(0, ...lines.map((l) => l.width)) + 2 * PAD;
-  const height = lines.length * lineHeight + 2 * PAD;
-  return { lines, width, height, lineHeight, firstBaseline: height - PAD - ttf.hhea.ascender * scale, missing };
-}
 
 export const fmt = (n: number) => {
   const s = n.toFixed(4).replace(/\.?0+$/, "");

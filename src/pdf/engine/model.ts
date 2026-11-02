@@ -21,3 +21,5 @@ export type TextBoxInput = Omit<TextBox, "id" | "objNum"> & { id?: string };
 
 /** /NM prefix that marks a FreeText as ours */
 export const NM_PREFIX = "typenote-";
+
+export const newBoxId = () => `${NM_PREFIX}${crypto.randomUUID()}`;

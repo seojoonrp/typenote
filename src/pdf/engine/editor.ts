@@ -2,7 +2,7 @@
 import * as mupdf from "mupdf";
 import { createFontObjects, rewriteFontObjects, type FontKit } from "./fonts";
 import { findSharedFonts, locateFreeText, readTextBoxes, removeFreeText, usedCodepoints, writeFreeText } from "./freetext";
-import { NM_PREFIX, type TextBox, type TextBoxInput, type Weight } from "./model";
+import { newBoxId, type TextBox, type TextBoxInput, type Weight } from "./model";
 
 export type SaveMode = "incremental" | "full";
 export type PutResult = { box: TextBox; missing: string[]; pages: number[] };
@@ -27,7 +27,7 @@ export class PdfEditor {
   /** Creates or updates a box. Moving it to another page recreates it there under the same id. */
   async putTextBox(input: TextBoxInput): Promise<PutResult> {
     const kit = await this.loadKit();
-    const box: TextBox = { ...input, id: input.id ?? `${NM_PREFIX}${crypto.randomUUID()}` };
+    const box: TextBox = { ...input, id: input.id ?? newBoxId() };
     if (box.page < 0 || box.page >= this.doc.countPages()) throw new Error(`no page ${box.page}`);
     const pages = [box.page];
     let existing = locateFreeText(this.doc, box.id);

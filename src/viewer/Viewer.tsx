@@ -1,22 +1,26 @@
 // Single-page viewer (Acrobat "Single Page" view): one page at a time, page-by-page navigation
 // when the page fits, scrolling within the page when it is taller. Worker-rendered bitmaps,
 // Ctrl+wheel / touchpad-pinch zoom previewed with a CSS transform and committed when it settles.
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import type { PdfClient } from "../pdf/client";
-import type { DocInfo } from "../pdf/protocol";
+import type { DocInfo, HiddenAnnots } from "../pdf/protocol";
 import { isPinch } from "./input";
 import { fitPageZoom, fitWidthZoom, PX_PER_PT, pageLayout, type PageLayout } from "./layout";
 import { keyNav, LINE, WheelPager, type Nav } from "./navigation";
 import { RenderCache, type Want } from "./renderCache";
 import { clampZoom, renderScale, stepZoom } from "./zoom";
 
-// App-managed annotations stay in the base bitmap until the overlays draw them (Phase 3/4).
-const HIDE_APP_ANNOTS = false;
+// App text boxes are drawn by the HTML overlay; highlights stay in the base bitmap until the
+// highlight overlay exists (Phase 4).
+const HIDDEN: HiddenAnnots = { textBoxes: true, highlights: false };
 /** pages rendered besides the current one, so flipping shows them at once */
 const PREFETCH = [1, 2, -1];
 const GESTURE_SETTLE_MS = 180;
 
 export type ZoomMode = "fit-page" | "fit-width" | "custom";
+
+/** The current page as the overlay sees it: its index and CSS px per pt. */
+export type PageView = { page: number; scale: number };
 
 export type ViewerHandle = {
   zoomIn(): void;
@@ -37,6 +41,8 @@ type Props = {
   initialZoom: number;
   onPageChange(page: number): void;
   onZoomChange(zoom: number, mode: ZoomMode): void;
+  /** drawn over the page bitmap, in page CSS px (page space × scale) */
+  overlay?: (view: PageView) => ReactNode;
 };
 
 type Anchor = { xPt: number; yPt: number; ax: number; ay: number };
@@ -45,7 +51,7 @@ type Gesture = { startZoom: number; factor: number; ax: number; ay: number; time
 const isEditable = (t: EventTarget | null) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable);
 
-export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChange, onZoomChange }: Props) {
+export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChange, onZoomChange, overlay }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -73,7 +79,7 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
             setVersion((v) => v + 1);
           });
         },
-        HIDE_APP_ANNOTS,
+        HIDDEN,
       ),
     [client],
   );
@@ -220,7 +226,7 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
   // keyboard: arrows, PageUp/PageDown, Home/End, all without scroll animation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.isComposing || e.keyCode === 229) return;
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
       if (e.altKey || e.metaKey || e.shiftKey) return;
       if (e.ctrlKey && e.key !== "Home" && e.key !== "End") return;
       if (isEditable(e.target)) return;
@@ -284,6 +290,7 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
       <div className="content" ref={contentRef} style={{ width: layout.contentWidth, height: layout.contentHeight }}>
         <div className="page" data-page={current + 1} style={{ top: layout.top, left: layout.left, width: layout.width, height: layout.height }}>
           <PageCanvas key={current} bitmap={bmp?.bitmap} />
+          {overlay?.({ page: current, scale: layout.scale })}
         </div>
       </div>
     </div>

@@ -46,7 +46,15 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 폰트 subset은 편집할 때마다 문서 전체에서 쓰인 글자의 합집합으로 같은 객체에 다시 쓴다. 글리프 집합이 같으면(subset 태그가 같으면) 건드리지 않는다.
 - worker는 저장한 직후 그 바이트로 문서를 다시 연다. 그래야 다음 incremental 저장이 그 위에 이어 붙는다. 디스크에는 항상 파일 전체를 temp 파일에 쓰고 rename한다(`write_pdf`).
 - UI 쪽 문서 상태, 변경 여부, 자동 저장(3초), 잠김 재시도(10초), 충돌 처리는 `src/doc/DocStore.ts`가 맡는다. 연 뒤에 디스크 파일이 바뀌면(크기나 수정 시각) 충돌로 보고 자동 저장을 멈춘다.
-- dev 빌드에만 `window.__typenote`(`store`, `addTestBox()`)가 있다. UI가 생기기 전 검증용이다.
+- dev 빌드에만 `window.__typenote`(`store`, `addTestBox()`)가 있다. `tools/`의 시나리오 스크립트가 쓴다.
+
+## 텍스트 상자 UI 구조 (Phase 3)
+- 앱 FreeText는 base 비트맵에서 숨기고 HTML overlay(`src/annot/TextLayer.tsx`)로 그린다. overlay의 상자 크기와 줄 위치는 **반드시 엔진의 `layoutText`(`src/pdf/engine/layout.ts`)와 `textCss`(`src/annot/style.ts`)로 계산**한다. DOM으로 측정하지 않는다. 그래야 AP와 일치한다(실측 차이 ≤2 device px, `tools/overlay-test.mjs`).
+- 메인 스레드 코드는 mupdf를 import하지 않는다. 메인에서 쓰는 엔진 모듈(`layout.ts`, `faces.ts`, `ttf.ts`, `model.ts`)은 mupdf에 의존하지 않게 유지한다.
+- 편집은 `DocStore`에서 즉시 반영된다(optimistic). undo/redo도 `DocStore`가 맡는다(`record`, `merge` 옵션). UI는 `putTextBox`/`deleteTextBox`만 부른다.
+- 키 처리 순서: 텍스트 도구(`useTextTool`, window **capture**)가 먼저 보고, 처리한 키는 `preventDefault`한다. 뷰어의 쪽 이동(window bubble)은 `defaultPrevented`이면 무시한다. 도구 단축키는 `e.code`(KeyT, KeyV)로 판별한다(한글 자판에서도 동작하도록).
+- 툴바는 **항상 한 줄, 높이 고정**이다. 높이가 바뀌면 페이지 영역이 줄어 쪽 맞춤이 다시 계산되고, 그 사이 들어온 키가 잘못 처리된다.
+- 실제 앱 UI 시나리오는 `tools/text-test.mjs`, overlay와 AP 비교는 `tools/overlay-test.mjs`로 돌린다.
 - `tauri.conf.json`의 `zoomHotkeysEnabled`는 **true로 유지**한다. false로 두면 wry가 WebView2 `IsPinchZoomEnabled`까지 꺼서 터치패드 핀치가 페이지에 전달되지 않는다. 대신 Ctrl+휠과 Ctrl+=/-/0/1/2는 앱이 전역에서 preventDefault한다(`src/viewer/input.ts`, `App.tsx`). 터치패드 핀치는 "물리 Ctrl 없이 ctrlKey가 켜진 wheel"로 들어오고, 배율은 `exp(-deltaY/100)`이다.
 - 실제 WebView2 동작은 `tools/run-app.ps1`(DevTools 프로토콜 포트 9222)로 검증한다. 키 입력, 휠, `Input.synthesizePinchGesture`, 스크린샷을 OS 입력 없이 재현할 수 있다. 디버그 빌드는 dev 서버(1420)를 띄우므로 `npm run dev`를 먼저 켠다. 저장 시나리오는 `tools/save-test.mjs`로 만든다. 단계 파일 안의 경로는 슬래시(`/`)로 쓴다(Git Bash의 `node -e`가 `\\`를 먹는다).
 - worker에서 mupdf는 **동적 import**한다. mupdf가 top-level await를 쓰기 때문에, 정적 import를 쓰면 로드되는 동안 들어온 메시지가 리스너 등록 전에 버려진다(`src/pdf/worker.ts`).
@@ -60,7 +68,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `fonts/` Pretendard TTF (원본, 수정 금지)
 - `samples/` 테스트용 PDF (원본, 수정 금지. 결과물은 다른 폴더에 쓴다)
 - `spike/` Phase 0 Node 스크립트와 결과(`spike/out/`), `spike/REPORT.md`
-- `src/` 프런트엔드: `pdf/`(worker 셸, 세션, 클라이언트), `pdf/engine/`(FreeText, 폰트, subset, 저장 엔진), `doc/`(DocStore), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
+- `src/` 프런트엔드: `pdf/`(worker 셸, 세션, 클라이언트), `pdf/engine/`(FreeText, 폰트, subset, 저장 엔진), `doc/`(DocStore: 상태, undo, 저장), `annot/`(텍스트 상자 overlay, 편집, 속성 바, 도구 상태), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
 - `tools/` 실제 WebView2 검증 도구(CDP 클라이언트, 실행 스크립트, 단계 파일과 생성기)
 - `src-tauri/` Rust 백엔드: `files.rs`(읽기, 원자적 쓰기, 잠김·충돌 판별, 실행 인자), `settings.rs`(settings.json, 최근 파일)
 

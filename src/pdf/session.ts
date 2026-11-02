@@ -8,7 +8,7 @@ import { PdfEditor } from "./engine/editor";
 import { makeFaces, type FontKit } from "./engine/fonts";
 import { NM_PREFIX } from "./engine/model";
 import { createSubsetter } from "./engine/subset";
-import type { ErrorCode, OpenResult, PageSize, PutTextBoxResult, RenderParams, RenderResult, Request, Response, SaveResult } from "./protocol";
+import type { ErrorCode, HiddenAnnots, OpenResult, PageSize, PutTextBoxResult, RenderParams, RenderResult, Request, Response, SaveResult } from "./protocol";
 
 const PAGE_CACHE = 8;
 
@@ -118,10 +118,10 @@ async function save(full: boolean): Promise<SaveResult> {
   return { bytes, mode, textBoxes: next.textBoxes() };
 }
 
-function isAppAnnot(annot: mupdf.PDFAnnotation): boolean {
+function isHidden(annot: mupdf.PDFAnnotation, hide: HiddenAnnots): boolean {
   const type = annot.getType();
-  if (type === "Highlight") return true;
-  if (type !== "FreeText") return false;
+  if (type === "Highlight") return hide.highlights;
+  if (type !== "FreeText" || !hide.textBoxes) return false;
   const nm = annot.getObject().get("NM");
   return nm.isString() && nm.asString().startsWith(NM_PREFIX);
 }
@@ -129,7 +129,7 @@ function isAppAnnot(annot: mupdf.PDFAnnotation): boolean {
 async function render(p: RenderParams): Promise<RenderResult> {
   if (!editor || p.docId !== docId) throw new SessionError("stale", "document changed");
   const page = getPage(p.page);
-  for (const a of page.getAnnotations()) a.setHiddenForEditing(p.hideAppAnnots && isAppAnnot(a));
+  for (const a of page.getAnnotations()) a.setHiddenForEditing(isHidden(a, p.hide));
 
   const m = mupdf.Matrix.scale(p.scale, p.scale);
   const b = mupdf.Rect.transform(page.getBounds(), m);

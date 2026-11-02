@@ -1,6 +1,7 @@
 // Page bitmaps keyed by (page, render scale), fetched from the worker on demand.
 import type { PdfClient } from "../pdf/client";
 import { PdfError } from "../pdf/client";
+import type { HiddenAnnots } from "../pdf/protocol";
 import { LruCache } from "./lru";
 
 export type PageBitmap = { page: number; scale: number; bitmap: ImageBitmap; width: number; height: number };
@@ -24,7 +25,7 @@ export class RenderCache {
   constructor(
     private client: PdfClient,
     private onReady: (page: number) => void,
-    private hideAppAnnots: boolean,
+    private hide: HiddenAnnots,
   ) {}
 
   setDoc(docId: number) {
@@ -86,7 +87,7 @@ export class RenderCache {
       if ((this.cache.get(k) && !this.outdated.has(k)) || this.inflight.has(k)) continue;
       const docId = this.docId;
       const gen = this.generation.get(w.page) ?? 0;
-      const { id, promise } = this.client.render({ docId, page: w.page, scale: w.scale, priority: w.priority, hideAppAnnots: this.hideAppAnnots });
+      const { id, promise } = this.client.render({ docId, page: w.page, scale: w.scale, priority: w.priority, hide: this.hide });
       this.inflight.set(k, id);
       promise.then(
         (r) => {

@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { AttributeBar } from "./annot/AttributeBar";
+import { useFaces } from "./annot/fonts";
+import { TextLayer } from "./annot/TextLayer";
+import { useTextTool } from "./annot/useTextTool";
 import { DocStore, type SaveOptions, type SaveProblem } from "./doc/DocStore";
 import { PdfClient, PdfError } from "./pdf/client";
 import type { TextBoxInput } from "./pdf/engine/model";
@@ -110,8 +114,8 @@ export function App() {
   }, [openPath, openLoaded]);
   useEffect(() => platform.onCloseRequested(() => settleUnsaved("닫을까요")), [settleUnsaved]);
 
-  // annotation edits change page images
-  useEffect(() => store.onPagesChanged((pages) => viewerRef.current?.invalidatePages(pages)), [store]);
+  const faces = useFaces();
+  const tt = useTextTool(store, faces, page);
 
   // focus the pages so arrow keys / PageUp / PageDown work right away
   const docId = doc?.info.docId;
@@ -150,7 +154,7 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [pick, save]);
 
-  // development hook until the text box UI exists (Phase 3): window.__typenote.addTestBox()
+  // development hook for scripted checks (tools/): window.__typenote.addTestBox()
   const pageRef = useRef(page);
   pageRef.current = page;
   useEffect(() => {
@@ -175,7 +179,7 @@ export function App() {
         <button onClick={() => void pick()} disabled={busy} title="열기 (Ctrl+O)">
           열기
         </button>
-        <Menu label="최근 파일 ▾" disabled={recent.length === 0} wide>
+        <Menu label="최근 ▾" disabled={recent.length === 0} wide>
           {recent.map((p) => (
             <button key={p} onClick={() => void openPath(p)} title={p}>
               {baseName(p)}
@@ -196,6 +200,27 @@ export function App() {
             </button>
           </Menu>
         )}
+        {doc && (
+          <>
+            <span className="sep" />
+            <button className={tt.tool === "select" ? "active" : ""} onClick={() => tt.setTool("select")} title="선택 (V)">
+              선택
+            </button>
+            <button className={tt.tool === "text" ? "active" : ""} onClick={() => tt.setTool("text")} title="텍스트 (T)">
+              텍스트
+            </button>
+            <span className="sep" />
+            <button onClick={() => void store.undo()} disabled={!state.canUndo} title="실행 취소 (Ctrl+Z)">
+              ↶
+            </button>
+            <button onClick={() => void store.redo()} disabled={!state.canRedo} title="다시 실행 (Ctrl+Y)">
+              ↷
+            </button>
+            {/* always present in the text tool, so selecting never reflows the toolbar (and the page);
+                it edits the selected box or, with nothing selected, the tool defaults */}
+            {tt.tool === "text" && <AttributeBar className="docked" value={tt.target} onChange={tt.setStyle} onStepSize={tt.stepSizeBy} />}
+          </>
+        )}
         <span className="title">{doc ? doc.name : ""}</span>
         {doc && <SaveStatus saving={state.saving} dirty={state.dirty} lastSave={state.lastSave} />}
         <span className="spacer" />
@@ -211,12 +236,17 @@ export function App() {
             <button onClick={() => viewerRef.current?.zoomIn()} title="확대 (Ctrl+=)">
               +
             </button>
-            <button onClick={() => viewerRef.current?.setMode("fit-page")} className={zoom.mode === "fit-page" ? "active" : ""} title="쪽 맞춤 (Ctrl+0)">
-              쪽 맞춤
-            </button>
-            <button onClick={() => viewerRef.current?.setMode("fit-width")} className={zoom.mode === "fit-width" ? "active" : ""} title="폭 맞춤 (Ctrl+2)">
-              폭 맞춤
-            </button>
+            <Menu label={zoom.mode === "fit-page" ? "쪽 맞춤 ▾" : zoom.mode === "fit-width" ? "폭 맞춤 ▾" : "맞춤 ▾"} align="right">
+              <button onClick={() => viewerRef.current?.setMode("fit-page")} className={zoom.mode === "fit-page" ? "active" : ""}>
+                쪽 맞춤<span className="dim">Ctrl+0</span>
+              </button>
+              <button onClick={() => viewerRef.current?.setMode("fit-width")} className={zoom.mode === "fit-width" ? "active" : ""}>
+                폭 맞춤<span className="dim">Ctrl+2</span>
+              </button>
+              <button onClick={() => viewerRef.current?.setZoom(1)}>
+                실제 크기 (100%)<span className="dim">Ctrl+1</span>
+              </button>
+            </Menu>
           </>
         )}
       </header>
@@ -250,6 +280,7 @@ export function App() {
           initialZoom={zoom.value}
           onPageChange={setPage}
           onZoomChange={onZoomChange}
+          overlay={(view) => faces && <TextLayer view={view} tt={tt} faces={faces} />}
         />
       ) : (
         <main className="start">
@@ -284,7 +315,7 @@ function SaveStatus({ saving, dirty, lastSave }: { saving: boolean; dirty: boole
 }
 
 /** Dropdown: a button and a list of buttons; closes on pick, mouse leave or Esc. */
-function Menu({ label, disabled, wide, children }: { label: string; disabled?: boolean; wide?: boolean; children: ReactNode[] }) {
+function Menu({ label, disabled, wide, align, children }: { label: string; disabled?: boolean; wide?: boolean; align?: "right"; children: ReactNode[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="menu" onMouseLeave={() => setOpen(false)} onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
@@ -292,7 +323,7 @@ function Menu({ label, disabled, wide, children }: { label: string; disabled?: b
         {label}
       </button>
       {open && (
-        <ul className={`menu-list${wide ? " wide" : ""}`} onClick={() => setOpen(false)}>
+        <ul className={`menu-list${wide ? " wide" : ""}${align === "right" ? " right" : ""}`} onClick={() => setOpen(false)}>
           {children.map((child, i) => (
             <li key={i}>{child}</li>
           ))}

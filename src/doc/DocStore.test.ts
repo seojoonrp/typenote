@@ -75,7 +75,7 @@ describe("DocStore", () => {
   it("an edit made while saving stays dirty and is saved next", async () => {
     const { store, client, writes, open } = setup();
     await open();
-    const { box } = await store.putTextBox(BOX);
+    const { box } = (await store.putTextBox(BOX))!;
     let release!: () => void;
     client.save.mockImplementationOnce(async () => {
       await new Promise<void>((r) => (release = r));
@@ -141,14 +141,72 @@ describe("DocStore", () => {
     expect(store.getState().dirty).toBe(true);
   });
 
-  it("tells listeners which pages to re-render", async () => {
+  it("applies edits before the worker answers, then fills in the object number", async () => {
+    const { store, client, open } = setup();
+    await open();
+    let release!: () => void;
+    client.putTextBox.mockImplementationOnce(async (b: TextBoxInput) => {
+      await new Promise<void>((r) => (release = r));
+      return { box: { ...b, id: b.id!, objNum: 77 }, missing: [], pages: [0] };
+    });
+    const pending = store.putTextBox({ ...BOX, x: 123 });
+    expect(store.getState().textBoxes).toMatchObject([{ x: 123, objNum: undefined }]);
+    expect(store.getState().textBoxes[0]!.id).toMatch(/^typenote-/);
+    release();
+    await pending;
+    expect(store.getState().textBoxes).toMatchObject([{ x: 123, objNum: 77 }]);
+  });
+
+  it("undo/redo walk through creates, edits and deletes, keeping the id", async () => {
+    const { store, client, open } = setup();
+    await open();
+    const { box } = (await store.putTextBox(BOX))!;
+    await store.putTextBox({ ...box, text: "나" });
+    await store.deleteTextBox(box.id);
+    expect(store.getState()).toMatchObject({ textBoxes: [], canUndo: true, canRedo: false });
+
+    await store.undo(); // delete
+    expect(store.getState().textBoxes).toMatchObject([{ id: box.id, text: "나" }]);
+    await store.undo(); // edit
+    expect(store.getState().textBoxes).toMatchObject([{ id: box.id, text: "가" }]);
+    await store.undo(); // create
+    expect(store.getState()).toMatchObject({ textBoxes: [], canUndo: false, canRedo: true });
+    expect(client.deleteTextBox).toHaveBeenLastCalledWith(box.id);
+
+    await store.redo();
+    expect(store.getState().textBoxes).toMatchObject([{ id: box.id, text: "가" }]);
+    expect(client.putTextBox).toHaveBeenLastCalledWith(expect.objectContaining({ id: box.id, text: "가" }));
+    await store.redo();
+    expect(store.getState().textBoxes).toMatchObject([{ id: box.id, text: "나" }]);
+
+    // a new edit drops the redo branch
+    await store.putTextBox({ ...box, text: "다" });
+    expect(store.getState().canRedo).toBe(false);
+  });
+
+  it("merges rapid edits with the same key into one undo step", async () => {
     const { store, open } = setup();
     await open();
-    const pages: number[][] = [];
-    store.onPagesChanged((p) => pages.push(p));
-    const { box } = await store.putTextBox(BOX);
-    await store.deleteTextBox(box.id);
-    expect(pages).toEqual([[0], [0]]);
+    const { box } = (await store.putTextBox(BOX))!;
+    for (let i = 1; i <= 5; i++) {
+      await store.putTextBox({ ...box, x: box.x + i }, { merge: `nudge:${box.id}` });
+      await vi.advanceTimersByTimeAsync(200);
+    }
+    await store.undo();
+    expect(store.getState().textBoxes[0]!.x).toBe(box.x);
+    await store.undo();
+    expect(store.getState().textBoxes).toEqual([]);
+  });
+
+  it("rolls back an edit the worker rejects", async () => {
+    const { store, client, open } = setup();
+    await open();
+    const { box } = (await store.putTextBox(BOX))!;
+    client.putTextBox.mockRejectedValueOnce(new Error("boom"));
+    expect(await store.putTextBox({ ...box, x: 500 })).toBeNull();
+    expect(store.getState().textBoxes[0]!.x).toBe(box.x);
+    expect(store.getState().editError).toBe("boom");
+    await store.undo(); // the rejected edit left no undo step: this undoes the create
     expect(store.getState().textBoxes).toEqual([]);
   });
 });
