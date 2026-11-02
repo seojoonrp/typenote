@@ -5,3 +5,5 @@ spike/out/
 *.log
 # 개인 PDF가 들어갈 수 있어서 샘플은 커밋하지 않음
 samples/
+# Tauri가 빌드 때 생성하는 스키마
+src-tauri/gen/

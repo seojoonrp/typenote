@@ -1,0 +1,972 @@
+[
+  {
+    "wait": 2000
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 2,
+      "key": "0",
+      "code": "Digit0",
+      "windowsVirtualKeyCode": 48
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 2,
+      "key": "0",
+      "code": "Digit0",
+      "windowsVirtualKeyCode": 48
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "wait": 300
+  },
+  {
+    "label": "fit page",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "PageDown x2",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "ArrowDown",
+      "code": "ArrowDown",
+      "windowsVirtualKeyCode": 40
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "ArrowDown",
+      "code": "ArrowDown",
+      "windowsVirtualKeyCode": 40
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "ArrowDown",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "ArrowUp",
+      "code": "ArrowUp",
+      "windowsVirtualKeyCode": 38
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "ArrowUp",
+      "code": "ArrowUp",
+      "windowsVirtualKeyCode": 38
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "ArrowUp",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "End",
+      "code": "End",
+      "windowsVirtualKeyCode": 35
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "End",
+      "code": "End",
+      "windowsVirtualKeyCode": 35
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "End",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "Home",
+      "code": "Home",
+      "windowsVirtualKeyCode": 36
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "Home",
+      "code": "Home",
+      "windowsVirtualKeyCode": 36
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "Home",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 100
+    }
+  },
+  {
+    "wait": 250
+  },
+  {
+    "label": "mouse wheel notch",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 100
+    }
+  },
+  {
+    "wait": 250
+  },
+  {
+    "label": "mouse wheel notch 2",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 16
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": 6
+    }
+  },
+  {
+    "wait": 12
+  },
+  {
+    "wait": 300
+  },
+  {
+    "label": "touchpad-like swipe (30 events, one burst)",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": -100
+    }
+  },
+  {
+    "wait": 250
+  },
+  {
+    "label": "wheel up notch",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "label": "open zoom field",
+    "eval": "document.querySelector(\"button.zoom\").click(); \"ok\""
+  },
+  {
+    "wait": 200
+  },
+  {
+    "label": "focused",
+    "eval": "document.activeElement?.tagName + \" \" + document.activeElement?.value"
+  },
+  {
+    "cmd": "Input.insertText",
+    "params": {
+      "text": "300"
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "Enter",
+      "code": "Enter",
+      "windowsVirtualKeyCode": 13
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "Enter",
+      "code": "Enter",
+      "windowsVirtualKeyCode": 13
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "wait": 300
+  },
+  {
+    "label": "typed 300 + Enter",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "label": "focus after commit",
+    "eval": "document.activeElement?.className"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "ArrowDown",
+      "code": "ArrowDown",
+      "windowsVirtualKeyCode": 40
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "ArrowDown",
+      "code": "ArrowDown",
+      "windowsVirtualKeyCode": 40
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "tall: ArrowDown",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "tall: PageDown",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageDown",
+      "code": "PageDown",
+      "windowsVirtualKeyCode": 34
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "tall: PageDown x6 more",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "PageUp",
+      "code": "PageUp",
+      "windowsVirtualKeyCode": 33
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "PageUp",
+      "code": "PageUp",
+      "windowsVirtualKeyCode": 33
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "tall: PageUp",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": -100
+    }
+  },
+  {
+    "wait": 250
+  },
+  {
+    "label": "tall: wheel up (native scroll)",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  },
+  {
+    "label": "zoom field Esc",
+    "eval": "document.querySelector(\"button.zoom\").click(); \"ok\""
+  },
+  {
+    "wait": 150
+  },
+  {
+    "cmd": "Input.insertText",
+    "params": {
+      "text": "55"
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 0,
+      "key": "Escape",
+      "code": "Escape",
+      "windowsVirtualKeyCode": 27
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "Escape",
+      "code": "Escape",
+      "windowsVirtualKeyCode": 27
+    }
+  },
+  {
+    "wait": 150
+  },
+  {
+    "label": "after Esc (unchanged)",
+    "eval": "({ page: document.querySelector(\".pages\")?.textContent, zoom: document.querySelector(\".zoom\")?.textContent, top: Math.round(document.querySelector(\".scroller\").scrollTop), maxTop: Math.round(document.querySelector(\".scroller\").scrollHeight - document.querySelector(\".scroller\").clientHeight) })"
+  }
+]

@@ -39,6 +39,9 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `page.toStructuredText()`는 주석을 포함하지 않는다(하이라이트 선택용으로 적합). 주석 텍스트는 `annot.toDisplayList().toStructuredText()`로 얻는다.
 - `/Contents`는 `newByteString()`으로 UTF-16BE+BOM을 강제한다. 줄바꿈은 `\r`로 쓰고, 읽을 때는 `\r\n|\r|\n`을 모두 허용한다.
 - hb-subset: harfbuzzjs v1 타입 API에는 subset이 없다. `harfbuzz-subset.wasm`을 직접 인스턴스화해서 C API를 호출한다(`spike/lib/subset.ts`). `RETAIN_GIDS = 0x2`.
+- `tauri.conf.json`의 `zoomHotkeysEnabled`는 **true로 유지**한다. false로 두면 wry가 WebView2 `IsPinchZoomEnabled`까지 꺼서 터치패드 핀치가 페이지에 전달되지 않는다. 대신 Ctrl+휠과 Ctrl+=/-/0/1/2는 앱이 전역에서 preventDefault한다(`src/viewer/input.ts`, `App.tsx`). 터치패드 핀치는 "물리 Ctrl 없이 ctrlKey가 켜진 wheel"로 들어오고, 배율은 `exp(-deltaY/100)`이다.
+- 실제 WebView2 동작은 `tools/run-app.ps1`(DevTools 프로토콜 포트 9222)로 검증한다. 키 입력, 휠, `Input.synthesizePinchGesture`, 스크린샷을 OS 입력 없이 재현할 수 있다. 디버그 빌드는 dev 서버(1420)를 띄우므로 `npm run dev`를 먼저 켠다.
+- worker에서 mupdf는 **동적 import**한다. mupdf가 top-level await를 쓰기 때문에, 정적 import를 쓰면 로드되는 동안 들어온 메시지가 리스너 등록 전에 버려진다(`src/pdf/worker.ts`).
 
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키·Enter·Esc 처리 금지.
@@ -49,3 +52,11 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `fonts/` Pretendard TTF (원본, 수정 금지)
 - `samples/` 테스트용 PDF (원본, 수정 금지. 결과물은 다른 폴더에 쓴다)
 - `spike/` Phase 0 Node 스크립트와 결과(`spike/out/`), `spike/REPORT.md`
+- `src/` 프런트엔드: `pdf/`(MuPDF worker와 클라이언트), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
+- `tools/` 실제 WebView2 검증 도구(CDP 클라이언트와 실행 스크립트, 단계 파일)
+- `src-tauri/` Rust 백엔드: `files.rs`(파일 읽기, 실행 인자), `settings.rs`(settings.json, 최근 파일)
+
+## 실행
+- 앱: `npm run tauri dev`. Rust가 PATH에 없으면 `~/.cargo/bin`을 추가한다.
+- 웹 레이어만 브라우저에서: `npm run dev` 후 `http://localhost:1420/?file=/samples/<파일>.pdf` (dev 전용 경로)
+- 검사: `npm run typecheck`, `npm test`, `cd src-tauri && cargo clippy`

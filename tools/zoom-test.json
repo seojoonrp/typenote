@@ -1,0 +1,144 @@
+[
+  {
+    "wait": 2000
+  },
+  {
+    "label": "start",
+    "eval": "({ zoom: document.querySelector('.zoom')?.textContent, dpr: devicePixelRatio, vv: visualViewport.scale, title: document.title })"
+  },
+  {
+    "label": "Ctrl+1 (100%)",
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 2,
+      "key": "1",
+      "code": "Digit1",
+      "windowsVirtualKeyCode": 49
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 2,
+      "key": "1",
+      "code": "Digit1",
+      "windowsVirtualKeyCode": 49
+    }
+  },
+  {
+    "wait": 400
+  },
+  {
+    "label": "after Ctrl+1",
+    "eval": "({ zoom: document.querySelector('.zoom')?.textContent, dpr: devicePixelRatio })"
+  },
+  {
+    "label": "install wheel logger",
+    "eval": "window.__w = []; window.addEventListener('wheel', e => window.__w.push([e.ctrlKey, +e.deltaY.toFixed(2), e.cancelable]), { capture: true, passive: true }); 'ok'"
+  },
+  {
+    "label": "touchpad pinch x2",
+    "cmd": "Input.synthesizePinchGesture",
+    "params": {
+      "x": 500,
+      "y": 400,
+      "scaleFactor": 2,
+      "relativeSpeed": 800,
+      "gestureSourceType": "mouse"
+    }
+  },
+  {
+    "wait": 800
+  },
+  {
+    "label": "after pinch x2",
+    "eval": "({ zoom: document.querySelector('.zoom')?.textContent, dpr: devicePixelRatio, vv: visualViewport.scale, events: window.__w.length, first: window.__w.slice(0, 3), sum: +window.__w.reduce((s, w) => s + w[1], 0).toFixed(1) })"
+  },
+  {
+    "label": "touchpad pinch x0.5",
+    "cmd": "Input.synthesizePinchGesture",
+    "params": {
+      "x": 500,
+      "y": 400,
+      "scaleFactor": 0.5,
+      "relativeSpeed": 800,
+      "gestureSourceType": "mouse"
+    }
+  },
+  {
+    "wait": 800
+  },
+  {
+    "label": "after pinch x0.5",
+    "eval": "({ zoom: document.querySelector('.zoom')?.textContent, dpr: devicePixelRatio, vv: visualViewport.scale })"
+  },
+  {
+    "label": "ctrl+mouse wheel up",
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 2,
+      "key": "Control",
+      "code": "ControlLeft",
+      "windowsVirtualKeyCode": 17
+    }
+  },
+  {
+    "cmd": "Input.dispatchMouseEvent",
+    "params": {
+      "type": "mouseWheel",
+      "x": 500,
+      "y": 400,
+      "deltaX": 0,
+      "deltaY": -100,
+      "modifiers": 2
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 0,
+      "key": "Control",
+      "code": "ControlLeft",
+      "windowsVirtualKeyCode": 17
+    }
+  },
+  {
+    "wait": 800
+  },
+  {
+    "label": "after ctrl+wheel",
+    "eval": "({ zoom: document.querySelector('.zoom')?.textContent, dpr: devicePixelRatio, vv: visualViewport.scale, last: window.__w.at(-1) })"
+  },
+  {
+    "label": "Ctrl+=",
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "rawKeyDown",
+      "modifiers": 2,
+      "key": "=",
+      "code": "Equal",
+      "windowsVirtualKeyCode": 187
+    }
+  },
+  {
+    "cmd": "Input.dispatchKeyEvent",
+    "params": {
+      "type": "keyUp",
+      "modifiers": 2,
+      "key": "=",
+      "code": "Equal",
+      "windowsVirtualKeyCode": 187
+    }
+  },
+  {
+    "wait": 400
+  },
+  {
+    "label": "after Ctrl+=",
+    "eval": "({ zoom: document.querySelector('.zoom')?.textContent, dpr: devicePixelRatio })"
+  }
+]
