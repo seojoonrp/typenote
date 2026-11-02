@@ -20,7 +20,7 @@
 - 표시: 색 + Multiply blend (글자가 검정 그대로 보이도록). 불투명도는 슬라이더로 10~100%, 10% 단위, 기본 40%. 모양은 줄마다 평평한 직사각형. 기본 색은 청록 (Phase 4에서 결정)
 
 **공통**
-- 열기: 대화상자, drag&drop, 최근 파일, .pdf 연결 프로그램 등록
+- 열기: 대화상자, drag&drop, 최근 파일, .pdf 연결 프로그램 등록. 앱이 켜져 있을 때 연결 프로그램이나 명령줄로 연 PDF는 새 창에서 열림. 그 파일을 이미 연 창이 있으면 그 창을 앞으로 가져오고, 문서가 없는 창이 있으면 그 창에서 엶 (Phase 5에서 결정)
 - 보기: 한 쪽씩 보기 (Acrobat 단일 페이지 보기처럼). 쪽 전체가 화면에 들어오는 배율이면 휠·화살표·PageUp/Down으로 쪽 단위로 애니메이션 없이 바로 이동하고, 쪽이 화면보다 길면 그 쪽 안에서 스크롤하다가 끝에서 다음 쪽으로 넘어감 (Phase 1 피드백으로 연속 스크롤에서 변경)
 - 줌: 쪽 맞춤, 폭 맞춤, % 직접 입력, Ctrl+휠, 터치패드 핀치
 - 편집·저장: undo/redo, Ctrl+S, autosave(편집 후 3초 동안 입력이 없으면 원본에 incremental 저장. Phase 2에서 결정), 닫기 전 확인
@@ -65,7 +65,7 @@
 
 문서를 열 때 주석 처리:
 - 앱이 만든 FreeText (/NM 고정 접두사로 식별): 모델로 import해서 편집 가능
-- 다른 프로그램이 만든 FreeText: 건드리지 않고 base에 렌더. 깨진 한글이 감지되면 복구를 제안 (아래 "저장" 참고)
+- 다른 프로그램이 만든 FreeText: 건드리지 않고 base에 렌더. 복구는 하지 않음 (아래 "저장" 참고)
 - Highlight: 출처와 상관없이 import (색 변경, 삭제 가능)
 
 ## FreeText 객체 (직접 생성)
@@ -124,7 +124,7 @@ overlay 일치:
 - repair된 문서(`wasRepaired()`)는 incremental 불가 → full save로 fallback
 - 메뉴에 full save(garbage collect) 제공. incremental이 쌓이면 죽은 폰트 subset이 누적되기 때문
 - 다른 프로그램이 파일을 잡고 있어서 쓰기가 실패하는 경우 처리
-- Acrobat FreeText 복구: AP 폰트에 FontFile이 없고 /Contents에 한글이 있으면, 앱 폰트로 AP를 재생성하자고 제안. 복구하면 앱 소유 주석으로 전환
+- ~~Acrobat FreeText 복구~~: 하지 않음 (Phase 5에서 결정). Phase 0에서 확인한 실제 깨짐은 FreeText가 아니라 Acrobat Fill & Sign이 페이지 내용에 평탄화한 글자였다(spike/REPORT.md). 다른 프로그램의 FreeText와 Fill & Sign 글자는 그대로 보여 주기만 하고, 앞으로의 타이핑은 이 앱으로 함
 
 ## 데이터 모델
 
@@ -151,7 +151,7 @@ Undo/redo는 command 패턴. 각 커맨드가 주석의 직렬화본을 보관.
 | 2 | AP 생성기, 폰트 subset/embed, incremental 저장을 앱 모듈로 이식 |
 | 3 | 텍스트 상자 UI (입력, IME, 이동, 재편집, 속성 바) |
 | 4 | 하이라이트 (선택, 미리보기, 더블클릭, 색 변경, 삭제) |
-| 5 | 기존 주석 import/복구, 호환성 테스트, 패키징 |
+| 5 | 기존 주석 import/복구(복구는 하지 않기로 결정), 호환성 테스트, 패키징, 파일마다 창 하나 |
 
 ## 핵심 리스크
 - MuPDF가 직접 만든 FreeText AP를 렌더나 저장 중에 재생성하는지

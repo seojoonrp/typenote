@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { baseName, isPdfName, SaveError, type FileStamp, type OpenedFile, type Platform, type SaveErrorKind } from "./types";
@@ -51,7 +52,27 @@ export const tauriPlatform: Platform = {
       }),
     );
   },
-  launchPath: () => invoke<string | null>("launch_path"),
+  onOpenRequest(cb) {
+    // the host keeps the file until asked (launch_path), and pings when another one arrives
+    let active = true;
+    const take = () =>
+      void invoke<string | null>("launch_path").then((path) => {
+        if (path && active) cb(path);
+      });
+    const stop = subscribe(async () => {
+      const unlisten = await getCurrentWebviewWindow().listen("open-request", take);
+      if (active) take();
+      return unlisten;
+    });
+    return () => {
+      active = false;
+      stop();
+    };
+  },
+  setOpenPath(path) {
+    void invoke("set_open_path", { path });
+  },
+  focusWindowShowing: (path) => invoke<boolean>("focus_window_showing", { path }),
   recentFiles: () => invoke<string[]>("recent_files"),
   addRecentFile: (path) => invoke<string[]>("add_recent_file", { path }),
   removeRecentFile: (path) => invoke<string[]>("remove_recent_file", { path }),
@@ -60,7 +81,7 @@ export const tauriPlatform: Platform = {
       getCurrentWebview().onDragDropEvent((ev) => {
         if (ev.payload.type !== "drop") return;
         const path = ev.payload.paths.find(isPdfName);
-        if (path) cb(() => readPath(path));
+        if (path) cb(() => readPath(path), path);
       }),
     );
   },

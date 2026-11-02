@@ -10,6 +10,7 @@ declare global {
 }
 
 const RECENT_KEY = "typenote.recent";
+let launchFile = new URLSearchParams(location.search).get("file");
 
 function loadRecent(): string[] {
   try {
@@ -64,8 +65,22 @@ export const browserPlatform: Platform = {
   onCloseRequested() {
     return () => {};
   },
-  async launchPath() {
-    return new URLSearchParams(location.search).get("file");
+  onOpenRequest(cb) {
+    // ?file= stands in for the launch file, delivered once
+    let active = true;
+    queueMicrotask(() => {
+      const path = launchFile;
+      if (!active || !path) return;
+      launchFile = null;
+      cb(path);
+    });
+    return () => {
+      active = false;
+    };
+  },
+  setOpenPath() {},
+  async focusWindowShowing() {
+    return false;
   },
   async recentFiles() {
     return loadRecent();
@@ -81,7 +96,7 @@ export const browserPlatform: Platform = {
     const drop = (e: DragEvent) => {
       e.preventDefault();
       const file = [...(e.dataTransfer?.files ?? [])].find((f) => isPdfName(f.name));
-      if (file) cb(() => fromFile(file));
+      if (file) cb(() => fromFile(file), null);
     };
     window.addEventListener("dragover", over);
     window.addEventListener("drop", drop);

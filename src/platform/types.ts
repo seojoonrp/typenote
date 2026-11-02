@@ -27,13 +27,20 @@ export interface Platform {
   ask(message: string, ok: string, cancel: string): Promise<boolean>;
   /** Runs before the window closes; returning false keeps it open. Returns an unsubscribe function. */
   onCloseRequested(handler: () => Promise<boolean>): () => void;
-  /** PDF given at launch (file association / command line) */
-  launchPath(): Promise<string | null>;
+  /**
+   * PDFs this window is asked to open: the launch file, and files opened through the file
+   * association while the app runs (one window per file). Returns an unsubscribe function.
+   */
+  onOpenRequest(cb: (path: string) => void): () => void;
+  /** Tells the host which file this window shows, so the file is not opened in two windows. */
+  setOpenPath(path: string | null): void;
+  /** Brings forward another window that shows `path`; false if there is none. */
+  focusWindowShowing(path: string): Promise<boolean>;
   recentFiles(): Promise<string[]>;
   addRecentFile(path: string): Promise<string[]>;
   removeRecentFile(path: string): Promise<string[]>;
   /** Subscribes to PDFs dropped on the window; returns an unsubscribe function. */
-  onFileDrop(cb: (load: () => Promise<OpenedFile>) => void): () => void;
+  onFileDrop(cb: (load: () => Promise<OpenedFile>, path: string | null) => void): () => void;
   setTitle(title: string): void;
 }
 

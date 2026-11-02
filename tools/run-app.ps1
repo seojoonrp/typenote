@@ -1,11 +1,13 @@
 # Runs the debug build with the WebView2 DevTools protocol on port 9222, shows the window
 # without stealing focus, plays a CDP step file (see cdp.mjs), then closes the app.
-# The debug build loads the frontend from the dev server: run `npm run dev` first.
-#   powershell -File tools/run-app.ps1 -Steps steps.json [-Pdf path\to\file.pdf]
-param([Parameter(Mandatory)][string]$Steps, [string]$Pdf)
+# The debug build loads the frontend from the dev server: run `npm run dev` first. -Release runs
+# the release build (`npm run tauri build`), which has the frontend built in.
+#   powershell -File tools/run-app.ps1 -Steps steps.json [-Pdf path\to\file.pdf] [-Release]
+param([Parameter(Mandatory)][string]$Steps, [string]$Pdf, [switch]$Release)
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $Pdf) { $Pdf = Join-Path $root "samples\sample-normal.pdf" }
-$exe = Join-Path $root "src-tauri\target\debug\typenote.exe"
+$build = if ($Release) { "release" } else { "debug" }
+$exe = Join-Path $root "src-tauri\target\$build\typenote.exe"
 Add-Type -TypeDefinition @"
 using System; using System.Runtime.InteropServices;
 public static class Win { [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd); }

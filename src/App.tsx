@@ -73,6 +73,8 @@ export function App() {
 
   const openLoaded = useCallback(
     async (load: () => Promise<OpenedFile>, path: string | null) => {
+      // a file shown in another window is not opened twice: that window comes forward
+      if (path && (await platform.focusWindowShowing(path))) return;
       if (!(await settleUnsaved("다른 파일을 열까요"))) return;
       setBusy(true);
       setError(null);
@@ -84,6 +86,7 @@ export function App() {
       } catch (e) {
         const reason = e instanceof PdfError ? e.message : `파일을 열 수 없습니다 (${e instanceof Error ? e.message : String(e)})`;
         setError(path ? `${baseName(path)}: ${reason}` : reason);
+        if (!store.getState().doc) platform.setOpenPath(null);
         if (path && !(e instanceof PdfError)) setRecent(await platform.removeRecentFile(path));
       } finally {
         setBusy(false);
@@ -104,19 +107,17 @@ export function App() {
 
   const save = useCallback((opts?: SaveOptions) => void store.save(opts), [store]);
 
-  // launch file, recent list, drag & drop, closing with unsaved edits
-  const launched = useRef(false);
+  // launch file and files opened while running, recent list, drag & drop, closing with unsaved edits
   useEffect(() => {
     void platform.recentFiles().then(setRecent);
-    if (!launched.current) {
-      launched.current = true;
-      void platform.launchPath().then((p) => {
-        if (p) void openPath(p);
-      });
-    }
-    return platform.onFileDrop((load) => void openLoaded(load, null));
-  }, [openPath, openLoaded]);
+  }, []);
+  useEffect(() => platform.onOpenRequest((p) => void openPath(p)), [openPath]);
+  useEffect(() => platform.onFileDrop((load, path) => void openLoaded(load, path)), [openLoaded]);
   useEffect(() => platform.onCloseRequested(() => settleUnsaved("닫을까요")), [settleUnsaved]);
+  const docPath = doc?.path;
+  useEffect(() => {
+    if (docPath) platform.setOpenPath(docPath);
+  }, [docPath]);
 
   const faces = useFaces();
   const tt = useTextTool(store, faces, page);
@@ -173,17 +174,18 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [pick, save]);
 
-  // development hook for scripted checks (tools/): window.__typenote.addTestBox()
+  // development hook for scripted checks (tools/): window.__typenote.addTestBox(), openPath()
   const pageRef = useRef(page);
   pageRef.current = page;
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as { __typenote: unknown }).__typenote = {
       store,
+      openPath,
       addTestBox: (patch: Partial<TextBoxInput> = {}) =>
         store.putTextBox({ page: pageRef.current, x: 60, y: 60, text: "테스트 상자 Test 123\n둘째 줄", size: 14, weight: "regular", color: [0.1, 0.2, 0.8], ...patch }),
     };
-  }, [store]);
+  }, [store, openPath]);
 
   const onZoomChange = useCallback((value: number, mode: ZoomMode) => {
     setZoom({ value, mode });

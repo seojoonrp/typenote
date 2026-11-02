@@ -67,6 +67,12 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `DocStore`는 텍스트 상자와 하이라이트를 **한 undo 스택**에서 다룬다(명령에 `kind`). 선택은 둘 중 하나만 된다(`App.tsx`).
 - 실제 앱 시나리오는 `tools/highlight-test.mjs`, overlay와 AP 비교는 `tools/highlight-compare.mjs`로 돌린다.
 
+## 창, 호환성, 배포 (Phase 5)
+- **파일마다 창 하나.** `tauri-plugin-single-instance`(반드시 첫 번째 플러그인)가 두 번째 실행의 명령줄을 첫 프로세스로 넘긴다. `src-tauri/src/windows.rs`가 창을 고른다: 그 파일을 연 창 → 문서가 없는 창 → 새 창(`doc-N`, main 창 설정 `app.windows[0]`을 복제하므로 `zoomHotkeysEnabled`도 같다). 열 파일은 Rust가 창별로 들고 있다가 프런트가 `launch_path`로 한 번 가져간다(`open-request` 이벤트는 신호만). 프런트는 연 파일을 `set_open_path`로 알리고, 다른 창에 이미 열린 파일은 `focus_window_showing`으로 그 창을 앞으로 가져온다. capability의 windows는 `["main", "doc-*"]`.
+- Windows에서는 이벤트 루프 스레드에서 webview 창을 만들면 멈춘다. 새 창은 별도 스레드에서 만든다.
+- 호환성: `src/pdf/engine/corpus.ts`(파일 구조 변형과 앱의 편집 왕복)를 `compat.test.ts`(단위 테스트)와 `tools/compat-render.ts`(MuPDF, poppler, PDFium, pdf.js 렌더 비교)가 함께 쓴다. MuPDF는 linearize 저장을 더 이상 지원하지 않는다.
+- 배포: `npm run tauri build` → `src-tauri/target/release/bundle/nsis/`의 설치 파일(사용자 단위 설치, 코드 서명 없음). release 빌드에는 dev hook이 없으므로 `tools/release-test.mjs` + `run-app.ps1 -Release`로 DOM과 실제 입력만 써서 확인한다. 창 동작은 `tools/window-test.mjs`(debug 빌드).
+
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키·Enter·Esc 처리 금지.
 - 확정은 Esc 또는 바깥 클릭. 빈 상자는 확정 시 자동 삭제.
@@ -84,3 +90,5 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 앱: `npm run tauri dev`. Rust가 PATH에 없으면 `~/.cargo/bin`을 추가한다.
 - 웹 레이어만 브라우저에서: `npm run dev` 후 `http://localhost:1420/?file=/samples/<파일>.pdf` (dev 전용 경로)
 - 검사: `npm run typecheck`, `npm test`, `cd src-tauri && cargo test && cargo clippy --all-targets`
+- 배포 빌드: `npm run tauri build` (처음에는 의존 crate 컴파일과 LTO 링크로 약 6분)
+- 렌더 엔진 비교: `cd spike && npx tsx ../tools/compat-render.ts <작업 폴더>` (poppler `pdftoppm` 필요)

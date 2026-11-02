@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::UNIX_EPOCH;
 use tauri::ipc::{InvokeBody, Request, Response};
 
@@ -13,16 +13,6 @@ pub async fn read_pdf(path: String) -> Result<Response, String> {
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
     Ok(Response::new(bytes))
-}
-
-/// The PDF passed on the command line (e.g. opened through the .pdf file association).
-#[tauri::command]
-pub fn launch_path() -> Option<String> {
-    std::env::args_os()
-        .skip(1)
-        .map(PathBuf::from)
-        .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")) && p.is_file())
-        .map(|p| p.to_string_lossy().into_owned())
 }
 
 /// Size and modification time, to notice when another program changed the file under us.
@@ -152,6 +142,7 @@ fn write_atomic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn temp_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("typenote-test-{name}-{}", std::process::id()));
