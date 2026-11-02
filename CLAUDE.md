@@ -80,6 +80,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
   - AP: 한글 글리프 뒤마다 TJ 숫자로 당긴다. `/W`는 공용 폰트 객체라 상자별로 바꿀 수 없으므로 건드리지 않는다.
   - overlay: 한글 글리프 hmtx advance를 줄인 TTF 사본(`withHangulTracking`)을 별도 family(`familyFor`)로 등록한다. 그래서 textarea도 같은 배치가 된다. 실측 차이는 이전과 같다(`tools/overlay-test.mjs`, 상자 3개가 자간 있음).
 - **하이라이트 높이**: worker의 `selectText`가 `StructuredText` quad를 글리프 외곽선에 맞춰 줄인다(`src/pdf/engine/glyphs.ts`). JS Device로 `runPageContents`를 돌려 글리프마다 `Text.getBounds`를 구하고 쪽별로 캐시한다. MuPDF는 text bounds에 device 단위 1을 더하므로 64배 행렬로 재고 나눈다.
+- **휠로 쪽 넘기기**(`navigation.ts`의 `WheelPager`): 쪽 끝에서 마우스 휠은 한 칸에 한 쪽(빠르게 굴려도 칸마다), 터치패드는 `SMOOTH_PAGE_PX`마다 한 쪽. 마우스 휠인지는 옛 `wheelDeltaY`가 120의 배수인지로 판단한다(`deltaY` 크기로는 빠른 터치패드와 구별되지 않음). 터치패드 관성이 긴 쪽의 끝에 닿아도 넘기지 않도록, 터치패드는 쪽 끝에서 시작한 burst만 넘긴다. 아직 그려지지 않은 연속 넘김은 `pageAhead`(300ms)로 이어 센다. 쪽 끝 판정 여유는 `EDGE_EPS` 1.5px다(배율에 따라 scrollTop이 58.3/59처럼 소수 픽셀에서 멈춰서 0.5px이면 쪽이 넘어가지 않았음). 스크립트로 보낸 wheel 이벤트는 네이티브 스크롤을 하지 않으므로, 쪽 안 스크롤까지 확인할 때는 CDP `Input.dispatchMouseEvent` mouseWheel(신뢰 이벤트, wheelDeltaY −120)을 쓴다.
 - **문서 스크롤바**: `src/viewer/DocScrollbar.tsx`. 네이티브 세로 스크롤바는 숨긴다(`::-webkit-scrollbar` width 0, 가로는 그대로). 휠은 `.viewer`에서 받아서 스크롤바 위에서도 쪽을 넘긴다.
 - 쪽 위에 뜨는 막대들은 `useKeepInside`(`src/annot/floating.ts`)로 쪽 안에 들어오게 밀고, `.content`는 `overflow: clip`이라 무엇이 삐져나와도 가로 스크롤이 생기지 않는다.
 - 텍스트 상자: 윤곽선(`.tbox-edge`)은 텍스트 도구에서도 이동 손잡이이고, 상자 안을 클릭하면 `caretIndexAt`로 클릭한 위치에 커서를 놓는다. 편집 중인 textarea에서는 layer의 mousedown preventDefault를 하지 않는다(그래야 클릭으로 커서가 옮겨진다).

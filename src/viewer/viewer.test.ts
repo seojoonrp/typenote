@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fitPageZoom, fitWidthZoom, PAD, pageLayout, PX_PER_PT } from "./layout";
 import { LruCache } from "./lru";
-import { BURST_GAP_MS, FLIP_THRESHOLD, keyNav, LINE, PAGE_OVERLAP, WheelPager, type NavState } from "./navigation";
+import { BURST_GAP_MS, keyNav, LINE, PAGE_OVERLAP, SMOOTH_PAGE_PX, WheelPager, type NavState } from "./navigation";
 import { bucketScale, MAX_PAGE_PIXELS, parseZoomPercent, renderScale, stepZoom } from "./zoom";
 
 const A4 = { width: 595, height: 842 };
@@ -71,31 +71,47 @@ describe("keyNav", () => {
   });
 });
 
+describe("page edges", () => {
+  it("counts a scroll position stopped a fraction of a pixel short as the edge", () => {
+    const s: NavState = { page: 0, pageCount: 3, top: 58.3, left: 0, maxTop: 59, maxLeft: 0, viewportHeight: 700 };
+    expect(keyNav("ArrowDown", s)).toEqual({ kind: "page", page: 1, align: "top" });
+    expect(keyNav("PageDown", s)).toEqual({ kind: "page", page: 1, align: "top" });
+  });
+});
+
 describe("WheelPager", () => {
-  it("flips once per burst when the page fits", () => {
+  it("flips a page per wheel notch when the page fits, however fast the notches come", () => {
     const p = new WheelPager();
     let t = 0;
-    const fits = (dy: number) => p.onWheel(dy, (t += 10), true, true);
-    expect(fits(FLIP_THRESHOLD / 2)).toBe("swallow");
-    expect(fits(FLIP_THRESHOLD / 2)).toBe(1);
-    for (let i = 0; i < 30; i++) expect(fits(30)).toBe("swallow"); // inertia
-    t += BURST_GAP_MS + 1;
-    expect(fits(100)).toBe(1); // next swipe / wheel notch
-    t += BURST_GAP_MS + 1;
-    expect(fits(-100)).toBe(-1);
+    const notch = (n = 1, dir = 1) => p.onWheel(100 * n * dir, (t += 15), true, true, n);
+    expect(notch()).toBe(1);
+    expect(notch()).toBe(1);
+    expect(notch()).toBe(1);
+    expect(notch(2)).toBe(2); // two notches in one event
+    expect(notch(1, -1)).toBe(-1);
   });
 
-  it("scrolls a tall page natively and only flips on a new burst at the edge", () => {
+  it("flips a page per SMOOTH_PAGE_PX of touchpad scrolling, several in a long swipe", () => {
+    const p = new WheelPager();
+    let t = 0;
+    const swipe = (dy: number) => p.onWheel(dy, (t += 10), true, true);
+    const flips = Array.from({ length: 30 }, () => swipe(25)).filter((r) => typeof r === "number");
+    expect(flips).toEqual([1, 1, 1]); // 750px
+    t += BURST_GAP_MS + 1;
+    expect(swipe(-SMOOTH_PAGE_PX)).toBe(-1);
+  });
+
+  it("scrolls a tall page natively; touchpad momentum does not flip at its edge, a notch does", () => {
     const p = new WheelPager();
     let t = 0;
     expect(p.onWheel(50, (t += 10), true, false)).toBe("native");
     // momentum reaches the bottom within the same burst: stop, no flip
-    expect(p.onWheel(50, (t += 10), false, true)).toBe("swallow");
-    expect(p.onWheel(50, (t += 10), false, true)).toBe("swallow");
+    for (let i = 0; i < 20; i++) expect(p.onWheel(50, (t += 10), false, true)).toBe("swallow");
     t += BURST_GAP_MS + 1;
-    expect(p.onWheel(100, t, false, true)).toBe(1);
-    // reversing direction starts a new burst
-    expect(p.onWheel(-100, (t += 10), true, false)).toBe(-1);
+    for (let i = 0; i < 4; i++) expect(p.onWheel(50, (t += 10), false, true)).toBe("swallow");
+    expect(p.onWheel(100, (t += 10), false, true)).toBe(1); // a new burst from the edge flips
+    // a wheel notch flips as soon as the edge is reached
+    expect(p.onWheel(-100, (t += 10), true, false, 1)).toBe(-1);
   });
 });
 

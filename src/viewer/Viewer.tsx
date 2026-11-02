@@ -7,7 +7,7 @@ import type { DocInfo, HiddenAnnots } from "../pdf/protocol";
 import { DocScrollbar } from "./DocScrollbar";
 import { isPinch } from "./input";
 import { fitPageZoom, fitWidthZoom, PX_PER_PT, pageLayout, type PageLayout } from "./layout";
-import { keyNav, LINE, WheelPager, type Nav } from "./navigation";
+import { EDGE_EPS, keyNav, LINE, WheelPager, wheelNotches, type Nav } from "./navigation";
 import { RenderCache, type Want } from "./renderCache";
 import { clampZoom, renderScale, stepZoom } from "./zoom";
 
@@ -16,6 +16,8 @@ const HIDDEN: HiddenAnnots = { textBoxes: true, highlights: true };
 /** pages rendered besides the current one, so flipping shows them at once */
 const PREFETCH = [1, 2, -1];
 const GESTURE_SETTLE_MS = 180;
+/** wheel flips this close together chain from the previous flip's page */
+const WHEEL_AHEAD_MS = 300;
 
 export type ZoomMode = "fit-page" | "fit-width" | "custom";
 
@@ -73,6 +75,11 @@ export function Viewer({ client, doc, ref, initialPage = 0, initialMode, initial
   const anchorRef = useRef<Anchor | null>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const pager = useMemo(() => new WheelPager(), []);
+  /**
+   * The page the last wheel flip went to, and when: flips that follow quickly count from there,
+   * not from the rendered page, which may still be behind (fast notches must not drop flips).
+   */
+  const pageAhead = useRef<{ page: number; at: number } | null>(null);
 
   // re-render when bitmaps arrive, at most once per frame
   const bump = useRef(0);
@@ -214,9 +221,9 @@ export function Viewer({ client, doc, ref, initialPage = 0, initialMode, initial
   );
 
   // listeners are registered once; they read the latest values through this ref
-  const live = useRef({ zoom, current, goTo, applyZoom, applyNav, onZoomChange });
+  const live = useRef({ zoom, current, pageCount: doc.pageCount, goTo, applyZoom, applyNav, onZoomChange });
   useLayoutEffect(() => {
-    live.current = { zoom, current, goTo, applyZoom, applyNav, onZoomChange };
+    live.current = { zoom, current, pageCount: doc.pageCount, goTo, applyZoom, applyNav, onZoomChange };
   });
 
   // wheel: Ctrl / pinch zooms; otherwise page-by-page at the page edges (also over the
@@ -254,7 +261,7 @@ export function Viewer({ client, doc, ref, initialPage = 0, initialMode, initial
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       const dy = e.deltaMode === 1 ? e.deltaY * LINE : e.deltaMode === 2 ? e.deltaY * el.clientHeight : e.deltaY;
       const maxTop = el.scrollHeight - el.clientHeight;
-      const r = pager.onWheel(dy, e.timeStamp, el.scrollTop <= 0.5, el.scrollTop >= maxTop - 0.5);
+      const r = pager.onWheel(dy, e.timeStamp, el.scrollTop <= EDGE_EPS, el.scrollTop >= maxTop - EDGE_EPS, wheelNotches(e));
       if (r === "native") {
         if (!el.contains(e.target as Node)) {
           e.preventDefault();
@@ -263,7 +270,12 @@ export function Viewer({ client, doc, ref, initialPage = 0, initialMode, initial
         return;
       }
       e.preventDefault();
-      if (r !== "swallow") s.goTo(s.current + r, r > 0 ? "top" : "bottom");
+      if (r === "swallow") return;
+      const ahead = pageAhead.current;
+      const from = ahead && e.timeStamp - ahead.at < WHEEL_AHEAD_MS ? ahead.page : s.current;
+      const to = Math.max(0, Math.min(s.pageCount - 1, from + r));
+      pageAhead.current = { page: to, at: e.timeStamp };
+      s.goTo(to, r > 0 ? "top" : "bottom");
     };
     outer.addEventListener("wheel", onWheel, { passive: false });
     return () => outer.removeEventListener("wheel", onWheel);

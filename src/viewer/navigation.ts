@@ -4,7 +4,12 @@
 
 export const LINE = 48;
 export const PAGE_OVERLAP = 40;
-const EPS = 0.5;
+/**
+ * How close to the end of the scroll range counts as the page edge. scrollTop stops at a
+ * fractional device-pixel position (e.g. 58.3 of 59 at 175% scaling), so 0.5 px left pages stuck.
+ */
+export const EDGE_EPS = 1.5;
+const EPS = EDGE_EPS;
 
 export type NavState = {
   page: number;
@@ -53,23 +58,29 @@ export function keyNav(key: string, s: NavState): Nav | null {
 }
 
 export const BURST_GAP_MS = 150;
-export const FLIP_THRESHOLD = 40;
+/** touchpad (smooth) scrolling at the page edge: this much flips a page */
+export const SMOOTH_PAGE_PX = 250;
 
 /**
- * Turns a stream of wheel events into page flips. A burst is a run of events less than
- * BURST_GAP_MS apart (one touchpad swipe including its inertia, or one wheel flick).
- * A burst flips at most one page, and only if it started at the page edge, so momentum that
- * scrolls a tall page down to its bottom does not also flip to the next page.
+ * Turns wheel events into page flips, like Acrobat's single page view: at the page edge every
+ * mouse-wheel notch flips a page, however fast they come, and touchpad scrolling flips a page per
+ * SMOOTH_PAGE_PX, so a long swipe goes through several pages. A page taller than the view scrolls
+ * natively first. Touchpad momentum that scrolls a tall page to its edge does not flip: a burst
+ * (events less than BURST_GAP_MS apart) flips only if it started at the edge. Wheel notches have
+ * no momentum, so they flip as soon as the edge is reached.
  */
 export class WheelPager {
   private last = -Infinity;
   private dir = 0;
   private acc = 0;
   private armed = false;
-  private flipped = false;
 
-  /** "native": let the browser scroll; "swallow": preventDefault; 1 / -1: flip to next / previous page. */
-  onWheel(dy: number, now: number, atTop: boolean, atBottom: boolean): "native" | "swallow" | 1 | -1 {
+  /**
+   * `notches`: mouse-wheel notches in this event (0 for touchpad scrolling).
+   * Returns "native" (let the browser scroll), "swallow" (preventDefault) or the number of pages
+   * to move (negative: back).
+   */
+  onWheel(dy: number, now: number, atTop: boolean, atBottom: boolean, notches = 0): "native" | "swallow" | number {
     const dir = Math.sign(dy);
     const newBurst = now - this.last > BURST_GAP_MS;
     this.last = now;
@@ -78,18 +89,25 @@ export class WheelPager {
     if (newBurst || dir !== this.dir) {
       this.dir = dir;
       this.acc = 0;
-      this.flipped = false;
       this.armed = atEdge;
     }
-    if (this.flipped) return "swallow";
     if (!atEdge) {
       this.armed = false;
+      this.acc = 0;
       return "native";
     }
+    if (notches > 0) return dir * notches;
     if (!this.armed) return "swallow";
     this.acc += Math.abs(dy);
-    if (this.acc < FLIP_THRESHOLD) return "swallow";
-    this.flipped = true;
-    return dir > 0 ? 1 : -1;
+    const pages = Math.floor(this.acc / SMOOTH_PAGE_PX);
+    if (pages === 0) return "swallow";
+    this.acc -= pages * SMOOTH_PAGE_PX;
+    return dir * pages;
   }
+}
+
+/** Mouse-wheel notches in a wheel event (0 for touchpad scrolling): the legacy wheelDelta is 120 per notch. */
+export function wheelNotches(e: WheelEvent): number {
+  const legacy = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY ?? 0;
+  return legacy !== 0 && legacy % 120 === 0 ? Math.abs(legacy) / 120 : 0;
 }
