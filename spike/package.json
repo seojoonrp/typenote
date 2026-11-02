@@ -1,0 +1,19 @@
+{
+  "name": "typenote-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "phase0": "tsx make-test.ts out/test.pdf && tsx write.ts out/test.pdf out/step1.pdf && tsx append.ts out/step1.pdf out/step2.pdf && tsx verify.ts out/step1.pdf && tsx verify.ts out/step2.pdf --baseline out/step1.pdf",
+    "inspect": "tsx inspect.ts"
+  },
+  "dependencies": {
+    "harfbuzzjs": "1.6.4",
+    "mupdf": "1.28.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

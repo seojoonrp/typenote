@@ -31,6 +31,15 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - synthetic bold, 시스템 폰트에 의존하는 렌더링
 - 범위 밖 기능 추가: 손글씨, 도형, 팝업 메모, 페이지 편집, OCR, 동기화, 상자 내부 부분 서식, 자동 줄바꿈 박스
 
+## Phase 0에서 확인된 구현 규칙 (mupdf 1.28.1, harfbuzzjs 1.6.4 기준, 근거는 spike/REPORT.md)
+- **앱 FreeText에는 PDFAnnotation setter(`setRect`, `setContents`, `setColor` 등) 사용 금지.** 호출 후 `update()`하면 MuPDF가 AP를 Helv/Batang으로 재생성한다. 이동, 수정, 삭제는 raw `PDFObject.put`/`writeStream`으로만 한다. raw 수정은 `page.update()`/`annot.update()`를 거쳐도 AP가 유지된다.
+- 저장 옵션은 `"incremental,compress"`. `wasRepaired()`이거나 `!canBeSavedIncrementally()`이면 `"garbage,compress"` full save로 한다.
+- raw로 `/Annots`를 바꾼 뒤에는 해당 `PDFPage`를 `destroy()`하고 다시 로드한다(주석 목록 캐시).
+- `Pixmap.getPixels()`는 WASM 메모리 뷰라서 즉시 `.slice()`로 복사한다.
+- `page.toStructuredText()`는 주석을 포함하지 않는다(하이라이트 선택용으로 적합). 주석 텍스트는 `annot.toDisplayList().toStructuredText()`로 얻는다.
+- `/Contents`는 `newByteString()`으로 UTF-16BE+BOM을 강제한다. 줄바꿈은 `\r`로 쓰고, 읽을 때는 `\r\n|\r|\n`을 모두 허용한다.
+- hb-subset: harfbuzzjs v1 타입 API에는 subset이 없다. `harfbuzz-subset.wasm`을 직접 인스턴스화해서 C API를 호출한다(`spike/lib/subset.ts`). `RETAIN_GIDS = 0x2`.
+
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키·Enter·Esc 처리 금지.
 - 확정은 Esc 또는 바깥 클릭. 빈 상자는 확정 시 자동 삭제.
