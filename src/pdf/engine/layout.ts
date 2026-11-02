@@ -8,7 +8,7 @@ import { trackingUnits, type Face } from "./faces";
 export const PAD = 2;
 
 /** Hangul letter spacing of new and re-edited boxes, in em (Latin, digits and symbols keep theirs) */
-export const HANGUL_TRACKING = -0.03;
+export const HANGUL_TRACKING = -0.015;
 
 export type Layout = {
   /** tracked[i]: gids[i] is a Hangul glyph, followed by `trackDelta` */

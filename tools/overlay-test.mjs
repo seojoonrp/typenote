@@ -15,9 +15,9 @@ const dir = (rawDir ?? "").replaceAll("\\", "/");
 if (!dir || (mode !== "steps" && mode !== "compare")) throw new Error("usage: node tools/overlay-test.mjs steps|compare <work dir>");
 
 const BOXES = [
-  { x: 60, y: 170, text: "Regular 10pt 가나다라 ABC 123", size: 10, weight: "regular", color: [0, 0, 0], tracking: -0.03 },
-  { x: 60, y: 192, text: "SemiBold 18pt 한글 Wy\n둘째 줄: 똠 햏 뷁 (2)", size: 18, weight: "semibold", color: [0.05, 0.3, 0.85], tracking: -0.03 },
-  { x: 60, y: 250, text: "Regular 24pt 큰 글씨 gjpqy", size: 24, weight: "regular", color: [0.85, 0.12, 0.12], tracking: -0.03 },
+  { x: 60, y: 170, text: "Regular 10pt 가나다라 ABC 123", size: 10, weight: "regular", color: [0, 0, 0], tracking: -0.015 },
+  { x: 60, y: 192, text: "SemiBold 18pt 한글 Wy\n둘째 줄: 똠 햏 뷁 (2)", size: 18, weight: "semibold", color: [0.05, 0.3, 0.85], tracking: -0.015 },
+  { x: 60, y: 250, text: "Regular 24pt 큰 글씨 gjpqy", size: 24, weight: "regular", color: [0.85, 0.12, 0.12], tracking: -0.015 },
   { x: 60, y: 290, text: "작은 8pt 글씨 테스트 abc xyz", size: 8, weight: "regular", color: [0, 0, 0] },
 ];
 // the first three with the Hangul letter spacing new boxes get (layout.ts HANGUL_TRACKING), the last without

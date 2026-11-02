@@ -76,7 +76,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 배포: `npm run tauri build` → `src-tauri/target/release/bundle/nsis/`의 설치 파일(사용자 단위 설치, 영어, 코드 서명 없음). release 빌드에는 dev hook이 없으므로 `tools/release-test.mjs` + `run-app.ps1 -Release`로 DOM과 실제 입력만 써서 확인한다. 탭 동작은 `tools/tab-test.mjs`(debug 빌드).
 
 ## 한글 자간, 하이라이트 높이, 스크롤바 (Phase 5 이후 피드백)
-- **한글 자간**은 상자 속성 `tracking`(em, `layout.ts`의 `HANGUL_TRACKING` = −0.03)이다. annot에 `/TypenoteTracking`으로 저장하고, 없으면 0(그 전에 만든 상자). 새 상자와 다시 편집한 상자가 현재 값을 받는다. 판정은 **글리프 단위**(`Face.hangul`: 한글 코드포인트가 가리키는 GID)다. 일부 글리프는 한글이 아닌 코드포인트와 공유된다.
+- **한글 자간**은 상자 속성 `tracking`(em, `layout.ts`의 `HANGUL_TRACKING` = −0.015, 처음엔 −0.03이었고 그 값으로 만든 상자도 있음)이다. annot에 `/TypenoteTracking`으로 저장하고, 없으면 0(그 전에 만든 상자). 새 상자와 다시 편집한 상자가 현재 값을 받는다. 판정은 **글리프 단위**(`Face.hangul`: 한글 코드포인트가 가리키는 GID)다. 일부 글리프는 한글이 아닌 코드포인트와 공유된다.
   - AP: 한글 글리프 뒤마다 TJ 숫자로 당긴다. `/W`는 공용 폰트 객체라 상자별로 바꿀 수 없으므로 건드리지 않는다.
   - overlay: 한글 글리프 hmtx advance를 줄인 TTF 사본(`withHangulTracking`)을 별도 family(`familyFor`)로 등록한다. 그래서 textarea도 같은 배치가 된다. 실측 차이는 이전과 같다(`tools/overlay-test.mjs`, 상자 3개가 자간 있음).
 - **하이라이트 높이**: worker의 `selectText`가 `StructuredText` quad를 글리프 외곽선에 맞춰 줄인다(`src/pdf/engine/glyphs.ts`). JS Device로 `runPageContents`를 돌려 글리프마다 `Text.getBounds`를 구하고 쪽별로 캐시한다. MuPDF는 text bounds에 device 단위 1을 더하므로 64배 행렬로 재고 나눈다.
@@ -85,7 +85,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 텍스트 상자: 윤곽선(`.tbox-edge`)은 텍스트 도구에서도 이동 손잡이이고, 상자 안을 클릭하면 `caretIndexAt`로 클릭한 위치에 커서를 놓는다. 편집 중인 textarea에서는 layer의 mousedown preventDefault를 하지 않는다(그래야 클릭으로 커서가 옮겨진다).
 
 ## 디자인
-- 다크 네이비 바탕에 빨강 포인트. 색과 크기 값은 `src/styles.css` 맨 위의 토큰(`--bg-0`~`--bg-5`, `--line`, `--text`~`--text-3`, `--red`…)으로만 쓴다. 빨강은 **지금 켜져 있거나 누를 것**에만 쓴다: 선택된 도구, 보이는 탭의 윗줄, 주 버튼, 하이라이트 선택선, 저장 안 된 점. **텍스트 상자의 점선·실선·커서는 남색**(`--navy-line`, 사용자 요청)이고, 선택 도구로 고른 페이지 글자는 파랑이다. 페이지는 흰색 그대로 둔다(PDF 렌더와 하이라이트 Multiply가 흰 바탕을 전제로 한다).
+- 다크 네이비 바탕에 빨강 포인트. 색과 크기 값은 `src/styles.css` 맨 위의 토큰(`--bg-0`~`--bg-5`, `--line`, `--text`~`--text-3`, `--red`…)으로만 쓴다. 빨강은 **지금 켜져 있거나 누를 것**에만 쓴다: 선택된 도구, 보이는 탭의 윗줄, 주 버튼, 하이라이트 선택선, 저장 안 된 점. **텍스트 상자의 점선·실선·커서는 남색**(`--navy-line`, 점선은 반투명 `--navy-dash`, 사용자 요청)이고 선은 `outline-offset`으로 글자에서 조금 띄운다(레이아웃은 그대로라 AP 일치에 영향 없음). 입력을 확정하면 상자 선택이 풀린다. 선택 도구로 고른 페이지 글자는 파랑이다. 페이지는 흰색 그대로 둔다(PDF 렌더와 하이라이트 Multiply가 흰 바탕을 전제로 한다).
 - UI 글꼴은 번들된 Pretendard(`"Pretendard UI"`, 400/600)다. overlay용 `TypenotePretendard` family와는 따로 등록한다. 500·700은 없으므로 쓰지 않는다(`font-synthesis: none`).
 - 아이콘은 `src/ui/Icon.tsx`의 선 아이콘(24 그리드, currentColor)만 쓴다. 버튼에 글자 대신 아이콘을 쓰면 `title`(단축키 포함)과 `aria-label`을 단다.
 - 로고는 빨간 둥근 사각형 위의 흰 문서(접힌 모서리)와 빨간 T, 그 아래 분홍 형광펜 띠다(PDF 앱 아이콘들을 레퍼런스로 함). `src-tauri/icons/source.svg`가 원본이고 `src/ui/Logo.tsx`가 같은 그림이다. 앱 아이콘은 `npx tauri icon src-tauri/icons/source.svg -o <임시 폴더>`로 만든 뒤 필요한 파일(32/64/128/128@2x png, icon.ico, icon.png)만 복사한다.

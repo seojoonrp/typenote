@@ -8,9 +8,9 @@ import { familyFor } from "./fonts";
 export type BoxStyle = { size: number; weight: Weight; color: RGB };
 
 export const DEFAULT_STYLE: BoxStyle = { size: 12, weight: "regular", color: [0, 0, 0] };
-export const SIZE_PRESETS = [10, 12, 14, 18, 24];
+export const SIZE_PRESETS = [10, 12, 14, 16, 20, 24];
 /** what the stepper / Ctrl+Shift+. walks through (the spec presets plus room at both ends) */
-export const SIZE_STEPS = [6, 8, 10, 12, 14, 18, 24, 30, 36, 48, 72];
+export const SIZE_STEPS = [6, 8, 10, 12, 14, 16, 20, 24, 30, 36, 48, 72];
 export const MIN_SIZE = 4;
 export const MAX_SIZE = 200;
 

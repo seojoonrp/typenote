@@ -5,10 +5,11 @@
 **텍스트 상자**
 - 클릭한 위치에 키보드로 입력. Typewriter 방식: 폭은 자동, 줄바꿈은 Enter로만 (자동 줄바꿈 없음)
 - 스타일은 상자 단위:
-  - 크기: pt 직접 입력 + 프리셋 10/12/14/18/24
+  - 크기: pt 직접 입력 + 프리셋 10/12/14/16/20/24 (기본 12. Phase 5 이후 피드백으로 18 대신 16, 20)
   - 굵기: Pretendard Regular / SemiBold
   - 색: 프리셋 + picker
-- 한글만 자간 −3% (영문, 숫자, 기호는 그대로). 새로 만들거나 다시 편집한 상자에 적용되고, 그 전에 만든 상자는 편집할 때까지 원래 자간 유지 (Phase 5 이후 피드백)
+- 한글만 자간 −1.5% (영문, 숫자, 기호는 그대로). 새로 만들거나 다시 편집한 상자에 적용되고, 그 전에 만든 상자는 편집할 때까지 원래 자간 유지 (Phase 5 이후 피드백. 처음 −3%에서 절반으로)
+- 입력을 확정하면(Esc, 바깥 클릭) 상자는 선택되지 않은 상태가 됨
 - 더블클릭 재편집, 드래그 이동, Delete 삭제. 빈 상자는 확정 시 자동 삭제
 - 텍스트 도구에서 상자를 클릭하면 클릭한 위치에 커서가 놓이고, 편집 중에도 글자를 클릭하면 그 위치로 커서가 옮겨짐. 상자의 윤곽선에 마우스를 올리면 이동 커서가 되고 끌어서 옮길 수 있음 (Phase 5 이후 피드백)
 - 선택한 상자 위에 floating 속성 바 (크기 stepper, B 토글, 색). 선택된 상자가 없을 때 바꾸면 도구 기본값이 됨
@@ -86,7 +87,7 @@ annot dict: /Type /Annot /Subtype /FreeText /Rect /F 4 /IT /FreeTextTypeWriter
   /DA (/PS 14 Tf r g b rg)  /NM (고정접두사-uuid)  /M  /CreationDate
   /AP << /N Form XObject >>
 
-  /TypenoteTracking -0.03  (한글 자간, em. 없으면 0. Phase 5 이후 피드백)
+  /TypenoteTracking -0.015  (한글 자간, em. 없으면 0. Phase 5 이후 피드백)
 
 AP Form XObject: /BBox [0 0 w h], 회전 페이지면 /Matrix에 회전 포함
   /Resources << /Font << /PR → Regular Type0, /PS → SemiBold Type0 >> >>

@@ -84,7 +84,8 @@ export function useTextTool(store: DocStore, faces: Faces | null, page: number) 
       return;
     }
     if (!existing || !sameBox(existing, box)) void store.putTextBox(box);
-    setSelectedId(box.id);
+    // done with this box: nothing stays selected
+    setSelectedId(null);
   }, [find, store]);
 
   const beginNew = (pageIndex: number, click: { x: number; y: number }) => {

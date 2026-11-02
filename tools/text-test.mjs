@@ -54,7 +54,7 @@ const steps = [
   type("둘째 줄"),
   { key: "Escape" },
   { wait: 300 },
-  st("A2 committed (1 box, 2 lines, selected)"),
+  st("A2 committed (1 box, 2 lines, nothing selected)"),
 
   // B. IME: Esc and Enter during composition must not commit or add lines; no duplicated syllable
   { click: "__pt(80, 260)", label: "new box" },
@@ -113,7 +113,8 @@ const steps = [
   { wait: 200 },
   st("E1 text ends with ' 추가'"),
 
-  // F. delete, undo, redo
+  // F. delete, undo, redo (finishing the edit left nothing selected)
+  { click: "__box(0)", label: "select box 0" },
   { key: "Delete" },
   st("F1 deleted"),
   { key: "z", mods: 2, label: "Ctrl+Z" },

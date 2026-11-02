@@ -92,9 +92,13 @@ export function TextLayer({ view, tt, faces, onBackgroundPress, onBackgroundDoub
   const barBox: TextBox | null = draft ?? (tt.selected?.page === page && !drag ? tt.selected : null);
   const barLayout = barBox && layoutText(barBox.text, faces[barBox.weight], barBox.size, barBox.tracking);
   let barTop = 0;
+  let barAbove = true;
   if (barBox && barLayout) {
     barTop = barBox.y * scale - BAR_HEIGHT_PX - BAR_GAP_PX;
-    if (barTop < 0) barTop = (barBox.y + barLayout.height) * scale + BAR_GAP_PX;
+    if (barTop < 0) {
+      barTop = (barBox.y + barLayout.height) * scale + BAR_GAP_PX;
+      barAbove = false;
+    }
   }
 
   return (
@@ -126,6 +130,7 @@ export function TextLayer({ view, tt, faces, onBackgroundPress, onBackgroundDoub
         <AttributeBar
           className="floating"
           style={{ left: Math.max(0, barBox.x * scale), top: barTop }}
+          listUp={barAbove}
           value={barBox}
           onChange={tt.setStyle}
           onStepSize={tt.stepSizeBy}
