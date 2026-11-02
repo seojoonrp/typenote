@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { DocStore, type SaveOptions, type SaveProblem } from "./doc/DocStore";
 import { PdfClient, PdfError } from "./pdf/client";
-import type { DocInfo } from "./pdf/protocol";
+import type { TextBoxInput } from "./pdf/engine/model";
 import { baseName, platform, type OpenedFile } from "./platform";
 import { Viewer, type ViewerHandle, type ZoomMode } from "./viewer/Viewer";
 import { ZoomField } from "./viewer/ZoomField";
 
-type OpenDoc = { info: DocInfo; name: string; path: string | null };
 type ZoomPref = { mode: ZoomMode; value: number };
 
-// one worker for the app's lifetime (not per render: StrictMode double-invokes initializers)
+// one worker and one document store for the app's lifetime (not per render: StrictMode
+// double-invokes initializers)
 let sharedClient: PdfClient | null = null;
+let sharedStore: DocStore | null = null;
 const getClient = () => (sharedClient ??= new PdfClient());
+const getStore = () => (sharedStore ??= new DocStore(getClient(), platform));
 
 // the zoom mode (or custom %) carries over to the next document and the next launch
 const ZOOM_KEY = "typenote.zoom";
@@ -31,28 +34,44 @@ function saveZoomPref(p: ZoomPref) {
   }
 }
 
+const PROBLEM_TEXT: Record<SaveProblem["kind"], string> = {
+  locked: "다른 프로그램이 이 파일을 열고 있어서 저장하지 못했습니다. 그 프로그램에서 파일을 닫으면 자동으로 다시 저장합니다.",
+  conflict: "열어 둔 사이에 다른 곳에서 파일이 바뀌었습니다. 자동 저장을 멈췄습니다.",
+  readonly: "읽기 전용 파일이라 저장할 수 없습니다.",
+  io: "저장하지 못했습니다.",
+  failed: "저장하지 못했습니다.",
+};
+
 export function App() {
   const client = getClient();
+  const store = getStore();
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  const { doc } = state;
   const viewerRef = useRef<ViewerHandle>(null);
-  const [doc, setDoc] = useState<OpenDoc | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState<ZoomPref>(loadZoomPref);
-  const [recentOpen, setRecentOpen] = useState(false);
+
+  /** Unsaved edits: try to save; if that fails, ask before throwing them away. */
+  const settleUnsaved = useCallback(
+    async (action: string) => {
+      if (!store.getState().dirty || (await store.save())) return true;
+      return platform.ask(`저장하지 못한 변경 사항이 있습니다. 저장하지 않고 ${action}?`, action.replace(/까요$/, ""), "취소");
+    },
+    [store],
+  );
 
   const openLoaded = useCallback(
     async (load: () => Promise<OpenedFile>, path: string | null) => {
+      if (!(await settleUnsaved("다른 파일을 열까요"))) return;
       setBusy(true);
       setError(null);
-      setRecentOpen(false);
       try {
         const file = await load();
-        const info = await client.open(file.bytes);
-        setDoc({ info, name: file.name, path: file.path });
+        await store.open(file);
         setPage(0);
-        platform.setTitle(`${file.name} — typenote`);
         if (file.path) setRecent(await platform.addRecentFile(file.path));
       } catch (e) {
         const reason = e instanceof PdfError ? e.message : `파일을 열 수 없습니다 (${e instanceof Error ? e.message : String(e)})`;
@@ -62,7 +81,7 @@ export function App() {
         setBusy(false);
       }
     },
-    [client],
+    [store, settleUnsaved],
   );
 
   const openPath = useCallback((path: string) => openLoaded(() => platform.readPath(path), path), [openLoaded]);
@@ -75,7 +94,9 @@ export function App() {
     if (file) void openLoaded(async () => file, file.path);
   }, [openLoaded]);
 
-  // launch file, recent list, drag & drop
+  const save = useCallback((opts?: SaveOptions) => void store.save(opts), [store]);
+
+  // launch file, recent list, drag & drop, closing with unsaved edits
   const launched = useRef(false);
   useEffect(() => {
     void platform.recentFiles().then(setRecent);
@@ -87,11 +108,16 @@ export function App() {
     }
     return platform.onFileDrop((load) => void openLoaded(load, null));
   }, [openPath, openLoaded]);
+  useEffect(() => platform.onCloseRequested(() => settleUnsaved("닫을까요")), [settleUnsaved]);
 
-  // focus the pages so arrow keys / PageUp / PageDown scroll right away
+  // annotation edits change page images
+  useEffect(() => store.onPagesChanged((pages) => viewerRef.current?.invalidatePages(pages)), [store]);
+
+  // focus the pages so arrow keys / PageUp / PageDown work right away
+  const docId = doc?.info.docId;
   useEffect(() => {
-    if (doc) viewerRef.current?.focus();
-  }, [doc]);
+    if (docId !== undefined) viewerRef.current?.focus();
+  }, [docId]);
 
   // shortcuts (never while an IME is composing). Zoom keys are always swallowed so WebView2
   // never zooms the UI itself.
@@ -100,6 +126,7 @@ export function App() {
       if (e.isComposing || e.keyCode === 229) return;
       if (!e.ctrlKey || e.altKey) return;
       const v = viewerRef.current;
+      const key = e.key.toLowerCase();
       const zoomKeys: Record<string, (() => void) | null | undefined> = {
         "=": v?.zoomIn,
         "+": v?.zoomIn,
@@ -111,19 +138,36 @@ export function App() {
       if (e.key in zoomKeys) {
         e.preventDefault();
         zoomKeys[e.key]?.();
-      } else if (e.key === "o" || e.key === "O") {
+      } else if (key === "o") {
         e.preventDefault();
         void pick();
+      } else if (key === "s") {
+        e.preventDefault();
+        save(e.shiftKey ? { saveAs: true } : undefined);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pick]);
+  }, [pick, save]);
+
+  // development hook until the text box UI exists (Phase 3): window.__typenote.addTestBox()
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as unknown as { __typenote: unknown }).__typenote = {
+      store,
+      addTestBox: (patch: Partial<TextBoxInput> = {}) =>
+        store.putTextBox({ page: pageRef.current, x: 60, y: 60, text: "테스트 상자 Test 123\n둘째 줄", size: 14, weight: "regular", color: [0.1, 0.2, 0.8], ...patch }),
+    };
+  }, [store]);
 
   const onZoomChange = useCallback((value: number, mode: ZoomMode) => {
     setZoom({ value, mode });
     saveZoomPref({ value, mode });
   }, []);
+
+  const problem = state.saveProblem;
 
   return (
     <div className="app">
@@ -131,24 +175,29 @@ export function App() {
         <button onClick={() => void pick()} disabled={busy} title="열기 (Ctrl+O)">
           열기
         </button>
-        <div className="menu">
-          <button onClick={() => setRecentOpen((o) => !o)} disabled={recent.length === 0} aria-expanded={recentOpen}>
-            최근 파일 ▾
-          </button>
-          {recentOpen && (
-            <ul className="menu-list" onMouseLeave={() => setRecentOpen(false)}>
-              {recent.map((p) => (
-                <li key={p}>
-                  <button onClick={() => void openPath(p)} title={p}>
-                    {baseName(p)}
-                    <span className="dim">{p}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <Menu label="최근 파일 ▾" disabled={recent.length === 0} wide>
+          {recent.map((p) => (
+            <button key={p} onClick={() => void openPath(p)} title={p}>
+              {baseName(p)}
+              <span className="dim">{p}</span>
+            </button>
+          ))}
+        </Menu>
+        {doc && (
+          <Menu label="저장 ▾">
+            <button onClick={() => save()}>
+              저장<span className="dim">Ctrl+S</span>
+            </button>
+            <button onClick={() => save({ saveAs: true })}>
+              다른 이름으로 저장…<span className="dim">Ctrl+Shift+S</span>
+            </button>
+            <button onClick={() => save({ full: true })}>
+              정리하여 저장<span className="dim">쌓인 변경 기록을 정리해 파일 크기를 줄입니다</span>
+            </button>
+          </Menu>
+        )}
         <span className="title">{doc ? doc.name : ""}</span>
+        {doc && <SaveStatus saving={state.saving} dirty={state.dirty} lastSave={state.lastSave} />}
         <span className="spacer" />
         {doc && (
           <>
@@ -176,6 +225,18 @@ export function App() {
         <div className="error" role="alert">
           {error}
           <button onClick={() => setError(null)}>닫기</button>
+        </div>
+      )}
+
+      {problem && (
+        <div className="error" role="alert">
+          <span>
+            {PROBLEM_TEXT[problem.kind]} <span className="dim">({problem.message})</span>
+          </span>
+          {(problem.kind === "locked" || problem.kind === "io" || problem.kind === "failed") && <button onClick={() => save()}>다시 시도</button>}
+          {problem.kind === "conflict" && <button onClick={() => save({ overwrite: true })}>덮어쓰기</button>}
+          <button onClick={() => save({ saveAs: true })}>다른 이름으로 저장…</button>
+          <button onClick={() => store.dismissProblem()}>닫기</button>
         </div>
       )}
 
@@ -209,6 +270,33 @@ export function App() {
             </ul>
           )}
         </main>
+      )}
+    </div>
+  );
+}
+
+function SaveStatus({ saving, dirty, lastSave }: { saving: boolean; dirty: boolean; lastSave: { at: number } | null }) {
+  let text = "";
+  if (saving) text = "저장 중…";
+  else if (dirty) text = "수정됨";
+  else if (lastSave) text = `저장됨 ${new Date(lastSave.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
+  return <span className="save-status dim">{text}</span>;
+}
+
+/** Dropdown: a button and a list of buttons; closes on pick, mouse leave or Esc. */
+function Menu({ label, disabled, wide, children }: { label: string; disabled?: boolean; wide?: boolean; children: ReactNode[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="menu" onMouseLeave={() => setOpen(false)} onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+      <button onClick={() => setOpen((o) => !o)} disabled={disabled} aria-expanded={open}>
+        {label}
+      </button>
+      {open && (
+        <ul className={`menu-list${wide ? " wide" : ""}`} onClick={() => setOpen(false)}>
+          {children.map((child, i) => (
+            <li key={i}>{child}</li>
+          ))}
+        </ul>
       )}
     </div>
   );

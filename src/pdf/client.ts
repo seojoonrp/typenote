@@ -1,5 +1,6 @@
 // Main-thread handle to the MuPDF worker.
-import type { DocInfo, ErrorCode, RenderParams, RenderResult, Request, Response } from "./protocol";
+import type { TextBoxInput } from "./engine/model";
+import type { ErrorCode, OpenResult, PutTextBoxResult, RenderParams, RenderResult, Request, Response, SaveResult } from "./protocol";
 
 export class PdfError extends Error {
   constructor(
@@ -45,12 +46,27 @@ export class PdfClient {
   }
 
   /** Takes ownership of the bytes (the buffer is transferred to the worker). */
-  open(bytes: Uint8Array): Promise<DocInfo> {
+  open(bytes: Uint8Array): Promise<OpenResult> {
     const buffer =
       bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength && bytes.buffer instanceof ArrayBuffer
         ? bytes.buffer
         : bytes.slice().buffer;
-    return this.send<DocInfo>({ kind: "open", bytes: buffer }, [buffer]).promise;
+    return this.send<OpenResult>({ kind: "open", bytes: buffer }, [buffer]).promise;
+  }
+
+  /** Creates (no id) or updates a text box; the result carries its id and object number. */
+  putTextBox(box: TextBoxInput): Promise<PutTextBoxResult> {
+    return this.send<PutTextBoxResult>({ kind: "putTextBox", box }).promise;
+  }
+
+  /** Resolves to the page the box was on, or null if it did not exist. */
+  deleteTextBox(boxId: string): Promise<number | null> {
+    return this.send<number | null>({ kind: "deleteTextBox", boxId }).promise;
+  }
+
+  /** The bytes to write to disk; the worker continues from them for the next save. */
+  save(full = false): Promise<SaveResult> {
+    return this.send<SaveResult>({ kind: "save", full }).promise;
   }
 
   close(): Promise<void> {

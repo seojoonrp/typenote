@@ -24,6 +24,8 @@ export type ViewerHandle = {
   setZoom(zoom: number): void;
   setMode(mode: "fit-page" | "fit-width"): void;
   goTo(page: number): void;
+  /** the pages' content changed (annotation edits): render them again */
+  invalidatePages(pages: number[]): void;
   focus(): void;
 };
 
@@ -52,6 +54,7 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
   const [mode, setMode] = useState<ZoomMode>(initialMode);
   const [customZoom, setCustomZoom] = useState(clampZoom(initialZoom));
   const [, setVersion] = useState(0);
+  const [epoch, setEpoch] = useState(0);
   const navRef = useRef<"top" | "bottom" | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
   const gestureRef = useRef<Gesture | null>(null);
@@ -250,9 +253,13 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
         setMode(m);
       },
       goTo: (p) => goTo(p, "top"),
+      invalidatePages: (pages) => {
+        cache.invalidate(pages);
+        setEpoch((e) => e + 1);
+      },
       focus: () => scrollerRef.current?.focus(),
     }),
-    [applyZoom, anchorAt, goTo, zoom, layout, viewport.width, viewport.height],
+    [applyZoom, anchorAt, goTo, cache, zoom, layout, viewport.width, viewport.height],
   );
 
   // render the current page first, then its neighbours
@@ -268,7 +275,7 @@ export function Viewer({ client, doc, ref, initialMode, initialZoom, onPageChang
       if (i >= 0 && i < doc.pageCount) wants.push({ page: i, scale: wantScale(i), priority: 1 });
     }
     cache.ensure(wants);
-  }, [cache, current, wantScale, viewport.width, doc.pageCount]);
+  }, [cache, current, wantScale, viewport.width, doc.pageCount, epoch]);
 
   const bmp = cache.best(current, wantScale(current));
 

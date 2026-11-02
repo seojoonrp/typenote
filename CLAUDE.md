@@ -38,9 +38,17 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `Pixmap.getPixels()`는 WASM 메모리 뷰라서 즉시 `.slice()`로 복사한다.
 - `page.toStructuredText()`는 주석을 포함하지 않는다(하이라이트 선택용으로 적합). 주석 텍스트는 `annot.toDisplayList().toStructuredText()`로 얻는다.
 - `/Contents`는 `newByteString()`으로 UTF-16BE+BOM을 강제한다. 줄바꿈은 `\r`로 쓰고, 읽을 때는 `\r\n|\r|\n`을 모두 허용한다.
-- hb-subset: harfbuzzjs v1 타입 API에는 subset이 없다. `harfbuzz-subset.wasm`을 직접 인스턴스화해서 C API를 호출한다(`spike/lib/subset.ts`). `RETAIN_GIDS = 0x2`.
+- hb-subset: harfbuzzjs v1 타입 API에는 subset이 없다. `harfbuzz-subset.wasm`을 직접 인스턴스화해서 C API를 호출한다(`src/pdf/engine/subset.ts`). `RETAIN_GIDS = 0x2`.
+
+## 편집과 저장 구조 (Phase 2)
+- PDF 쓰기는 모두 `src/pdf/engine/`(`PdfEditor`)를 거친다. 이 엔진은 worker(`src/pdf/session.ts`)와 Node 테스트(`engine.test.ts`)가 함께 쓴다. 폰트와 hb-subset wasm은 주입받는다(`FontKit`).
+- 상자 id는 `/NM`(`typenote-` + uuid)이다. 위치 x, y는 MuPDF page space에서 상자의 왼쪽 위다. 같은 id로 다시 `putTextBox`하면 annot과 AP 객체 번호를 유지한 채 고쳐 쓴다.
+- 폰트 subset은 편집할 때마다 문서 전체에서 쓰인 글자의 합집합으로 같은 객체에 다시 쓴다. 글리프 집합이 같으면(subset 태그가 같으면) 건드리지 않는다.
+- worker는 저장한 직후 그 바이트로 문서를 다시 연다. 그래야 다음 incremental 저장이 그 위에 이어 붙는다. 디스크에는 항상 파일 전체를 temp 파일에 쓰고 rename한다(`write_pdf`).
+- UI 쪽 문서 상태, 변경 여부, 자동 저장(3초), 잠김 재시도(10초), 충돌 처리는 `src/doc/DocStore.ts`가 맡는다. 연 뒤에 디스크 파일이 바뀌면(크기나 수정 시각) 충돌로 보고 자동 저장을 멈춘다.
+- dev 빌드에만 `window.__typenote`(`store`, `addTestBox()`)가 있다. UI가 생기기 전 검증용이다.
 - `tauri.conf.json`의 `zoomHotkeysEnabled`는 **true로 유지**한다. false로 두면 wry가 WebView2 `IsPinchZoomEnabled`까지 꺼서 터치패드 핀치가 페이지에 전달되지 않는다. 대신 Ctrl+휠과 Ctrl+=/-/0/1/2는 앱이 전역에서 preventDefault한다(`src/viewer/input.ts`, `App.tsx`). 터치패드 핀치는 "물리 Ctrl 없이 ctrlKey가 켜진 wheel"로 들어오고, 배율은 `exp(-deltaY/100)`이다.
-- 실제 WebView2 동작은 `tools/run-app.ps1`(DevTools 프로토콜 포트 9222)로 검증한다. 키 입력, 휠, `Input.synthesizePinchGesture`, 스크린샷을 OS 입력 없이 재현할 수 있다. 디버그 빌드는 dev 서버(1420)를 띄우므로 `npm run dev`를 먼저 켠다.
+- 실제 WebView2 동작은 `tools/run-app.ps1`(DevTools 프로토콜 포트 9222)로 검증한다. 키 입력, 휠, `Input.synthesizePinchGesture`, 스크린샷을 OS 입력 없이 재현할 수 있다. 디버그 빌드는 dev 서버(1420)를 띄우므로 `npm run dev`를 먼저 켠다. 저장 시나리오는 `tools/save-test.mjs`로 만든다. 단계 파일 안의 경로는 슬래시(`/`)로 쓴다(Git Bash의 `node -e`가 `\\`를 먹는다).
 - worker에서 mupdf는 **동적 import**한다. mupdf가 top-level await를 쓰기 때문에, 정적 import를 쓰면 로드되는 동안 들어온 메시지가 리스너 등록 전에 버려진다(`src/pdf/worker.ts`).
 
 ## 텍스트 입력 주의
@@ -52,11 +60,11 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `fonts/` Pretendard TTF (원본, 수정 금지)
 - `samples/` 테스트용 PDF (원본, 수정 금지. 결과물은 다른 폴더에 쓴다)
 - `spike/` Phase 0 Node 스크립트와 결과(`spike/out/`), `spike/REPORT.md`
-- `src/` 프런트엔드: `pdf/`(MuPDF worker와 클라이언트), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
-- `tools/` 실제 WebView2 검증 도구(CDP 클라이언트와 실행 스크립트, 단계 파일)
-- `src-tauri/` Rust 백엔드: `files.rs`(파일 읽기, 실행 인자), `settings.rs`(settings.json, 최근 파일)
+- `src/` 프런트엔드: `pdf/`(worker 셸, 세션, 클라이언트), `pdf/engine/`(FreeText, 폰트, subset, 저장 엔진), `doc/`(DocStore), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
+- `tools/` 실제 WebView2 검증 도구(CDP 클라이언트, 실행 스크립트, 단계 파일과 생성기)
+- `src-tauri/` Rust 백엔드: `files.rs`(읽기, 원자적 쓰기, 잠김·충돌 판별, 실행 인자), `settings.rs`(settings.json, 최근 파일)
 
 ## 실행
 - 앱: `npm run tauri dev`. Rust가 PATH에 없으면 `~/.cargo/bin`을 추가한다.
 - 웹 레이어만 브라우저에서: `npm run dev` 후 `http://localhost:1420/?file=/samples/<파일>.pdf` (dev 전용 경로)
-- 검사: `npm run typecheck`, `npm test`, `cd src-tauri && cargo clippy`
+- 검사: `npm run typecheck`, `npm test`, `cd src-tauri && cargo test && cargo clippy --all-targets`

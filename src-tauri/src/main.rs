@@ -10,6 +10,8 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             files::read_pdf,
+            files::write_pdf,
+            files::file_stamp,
             files::launch_path,
             settings::recent_files,
             settings::add_recent_file,

@@ -3,5 +3,13 @@
   "identifier": "default",
   "description": "Main window",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-set-title", "dialog:allow-open"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-title",
+    "core:window:allow-destroy",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-ask",
+    "dialog:allow-message"
+  ]
 }

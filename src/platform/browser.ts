@@ -1,6 +1,13 @@
 // Development fallback so the UI runs in a plain browser (vite dev): file picker,
 // HTML drag & drop, and ?file=/samples/x.pdf for loading a file served by the dev server.
+// Saving cannot reach the disk here: written bytes are kept in window.__typenoteSaved.
 import { baseName, isPdfName, type OpenedFile, type Platform } from "./types";
+
+declare global {
+  interface Window {
+    __typenoteSaved?: Map<string, Uint8Array>;
+  }
+}
 
 const RECENT_KEY = "typenote.recent";
 
@@ -22,7 +29,7 @@ function saveRecent(list: string[]): string[] {
 }
 
 async function fromFile(file: File): Promise<OpenedFile> {
-  return { name: file.name, path: null, bytes: new Uint8Array(await file.arrayBuffer()) };
+  return { name: file.name, path: null, bytes: new Uint8Array(await file.arrayBuffer()), stamp: null };
 }
 
 export const browserPlatform: Platform = {
@@ -42,7 +49,20 @@ export const browserPlatform: Platform = {
   async readPath(path) {
     const res = await fetch(path);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return { name: baseName(path), path, bytes: new Uint8Array(await res.arrayBuffer()) };
+    return { name: baseName(path), path, bytes: new Uint8Array(await res.arrayBuffer()), stamp: null };
+  },
+  async writePdf(path, bytes) {
+    (window.__typenoteSaved ??= new Map()).set(path, bytes.slice());
+    return { size: bytes.byteLength, modified: Date.now() };
+  },
+  async pickSavePath(defaultPath) {
+    return window.prompt("저장할 이름 (브라우저에서는 메모리에만 저장)", defaultPath);
+  },
+  async ask(message) {
+    return window.confirm(message);
+  },
+  onCloseRequested() {
+    return () => {};
   },
   async launchPath() {
     return new URLSearchParams(location.search).get("file");

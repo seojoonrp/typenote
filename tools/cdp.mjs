@@ -1,7 +1,9 @@
 // Minimal CDP client for the WebView2 inside the Tauri app (started by run-app.ps1).
 // usage: node cdp.mjs <steps.json>, a list of steps:
 //   {"eval": "js expr"} | {"cmd": "Domain.method", "params": {...}} | {"wait": ms} | {"shot": "out.png"}
+//   | {"ps": "PowerShell script"}  (runs in the background, e.g. to lock the file from another process)
 import fs from "node:fs";
+import { spawn } from "node:child_process";
 
 const steps = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 let targets = [];
@@ -35,6 +37,13 @@ const send = (method, params = {}) =>
 
 for (const step of steps) {
   if (step.wait) await new Promise((r) => setTimeout(r, step.wait));
+  else if (step.ps) {
+    // -EncodedCommand avoids Windows command-line quoting mangling the script; not detached,
+    // since a detached console process never ran here
+    const encoded = Buffer.from(step.ps, "utf16le").toString("base64");
+    spawn("powershell", ["-NoProfile", "-EncodedCommand", encoded], { stdio: "ignore" }).unref();
+    console.log("started powershell script");
+  }
   else if (step.shot) {
     const r = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(step.shot, Buffer.from(r.result.data, "base64"));

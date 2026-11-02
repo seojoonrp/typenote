@@ -16,6 +16,10 @@ export class RenderCache {
   private inflight = new Map<string, number>();
   private wanted = new Set<string>();
   private docId = 0;
+  /** bumped per page when its content changes; renders started before that are discarded */
+  private generation = new Map<number, number>();
+  /** cached but outdated: still shown until the fresh render arrives */
+  private outdated = new Set<string>();
 
   constructor(
     private client: PdfClient,
@@ -28,7 +32,25 @@ export class RenderCache {
     this.inflight.clear();
     this.wanted.clear();
     this.cache.clear();
+    this.outdated.clear();
+    this.generation.clear();
     this.docId = docId;
+  }
+
+  /** The pages' content changed: re-render them on the next ensure(), showing the old bitmaps meanwhile. */
+  invalidate(pages: number[]) {
+    const stale: number[] = [];
+    for (const page of pages) {
+      this.generation.set(page, (this.generation.get(page) ?? 0) + 1);
+      for (const k of this.cache.keys()) if (this.cache.peek(k)!.page === page) this.outdated.add(k);
+      for (const [k, id] of this.inflight) {
+        if (k.startsWith(`${page}@`)) {
+          stale.push(id);
+          this.inflight.delete(k);
+        }
+      }
+    }
+    this.client.cancel(stale);
   }
 
   /** Exact match if cached, else the closest cached scale for that page (sharper first). */
@@ -61,17 +83,19 @@ export class RenderCache {
 
     for (const w of wants) {
       const k = keyOf(w.page, w.scale);
-      if (this.cache.get(k) || this.inflight.has(k)) continue;
+      if ((this.cache.get(k) && !this.outdated.has(k)) || this.inflight.has(k)) continue;
       const docId = this.docId;
+      const gen = this.generation.get(w.page) ?? 0;
       const { id, promise } = this.client.render({ docId, page: w.page, scale: w.scale, priority: w.priority, hideAppAnnots: this.hideAppAnnots });
       this.inflight.set(k, id);
       promise.then(
         (r) => {
           if (this.inflight.get(k) === id) this.inflight.delete(k);
-          if (docId !== this.docId) {
+          if (docId !== this.docId || gen !== (this.generation.get(w.page) ?? 0)) {
             r.bitmap.close();
             return;
           }
+          this.outdated.delete(k);
           this.cache.set(k, { page: w.page, scale: w.scale, ...r }, r.width * r.height, (key) => this.wanted.has(key));
           this.onReady(w.page);
         },

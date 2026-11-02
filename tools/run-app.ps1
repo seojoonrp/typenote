@@ -15,6 +15,6 @@ $p = Start-Process -FilePath $exe -ArgumentList "`"$Pdf`"" -PassThru
 for ($i = 0; $i -lt 40; $i++) { Start-Sleep -Milliseconds 250; $p.Refresh(); if ($p.MainWindowHandle -ne 0) { break } }
 [Win]::ShowWindow($p.MainWindowHandle, 4) | Out-Null   # SW_SHOWNOACTIVATE
 node (Join-Path $PSScriptRoot "cdp.mjs") $Steps
+# a normal close: the app saves unsaved edits first
 $null = $p.CloseMainWindow()
-Start-Sleep -Seconds 1
-if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+if (-not $p.WaitForExit(8000)) { Write-Output "app did not close in 8s, killing"; Stop-Process -Id $p.Id -Force }

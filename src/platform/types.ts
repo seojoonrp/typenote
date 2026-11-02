@@ -1,9 +1,32 @@
-export type OpenedFile = { name: string; path: string | null; bytes: Uint8Array };
+/** Size + modification time when the file was opened or last saved (detects outside changes). */
+export type FileStamp = { size: number; modified: number };
+
+export type OpenedFile = { name: string; path: string | null; bytes: Uint8Array; stamp: FileStamp | null };
+
+export type SaveErrorKind = "locked" | "conflict" | "readonly" | "io";
+export class SaveError extends Error {
+  constructor(
+    readonly kind: SaveErrorKind,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 /** What the UI needs from the host. Tauri in the app; a browser fallback for development. */
 export interface Platform {
   pickPdf(): Promise<OpenedFile | null>;
   readPath(path: string): Promise<OpenedFile>;
+  /**
+   * Replaces the file with `bytes` (temp file + rename). With `expected`, refuses with a
+   * "conflict" SaveError if the file on disk no longer matches it. Returns the new stamp.
+   */
+  writePdf(path: string, bytes: Uint8Array, expected: FileStamp | null): Promise<FileStamp>;
+  pickSavePath(defaultPath: string): Promise<string | null>;
+  /** A yes/no question; resolves true for the ok button. */
+  ask(message: string, ok: string, cancel: string): Promise<boolean>;
+  /** Runs before the window closes; returning false keeps it open. Returns an unsubscribe function. */
+  onCloseRequested(handler: () => Promise<boolean>): () => void;
   /** PDF given at launch (file association / command line) */
   launchPath(): Promise<string | null>;
   recentFiles(): Promise<string[]>;
