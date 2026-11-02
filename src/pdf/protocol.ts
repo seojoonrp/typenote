@@ -43,6 +43,7 @@ export type Request =
   | { id: number; kind: "putHighlight"; highlight: HighlightInput }
   | { id: number; kind: "deleteHighlight"; highlightId: string }
   | ({ id: number; kind: "selectText" } & SelectTextParams)
+  | ({ id: number; kind: "copyText" } & SelectTextParams)
   | { id: number; kind: "save"; full: boolean };
 
 export type ErrorCode = "needs-password" | "not-pdf" | "cancelled" | "stale" | "no-document" | "failed";

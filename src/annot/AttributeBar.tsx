@@ -1,5 +1,6 @@
 // Size stepper, weight toggle and colors for a text box (or the tool defaults).
 import { useEffect, useState, type CSSProperties, type MouseEvent } from "react";
+import { Icon } from "../ui/Icon";
 import { useKeepInside } from "./floating";
 import { clampSize, COLOR_PRESETS, cssColor, hexToRgb, rgbToHex, sameColor, SIZE_PRESETS, type BoxStyle } from "./style";
 import { KEEP_DRAFT_ATTR } from "./useTextTool";
@@ -38,8 +39,8 @@ export function AttributeBar({ value, onChange, onStepSize, onDelete, onDone, cl
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      <button onMouseDown={keepFocus} onClick={() => onStepSize(-1)} title="Smaller (Ctrl+Shift+,)">
-        −
+      <button onMouseDown={keepFocus} onClick={() => onStepSize(-1)} title="Smaller (Ctrl+Shift+,)" aria-label="Smaller">
+        <Icon name="minus" size={14} />
       </button>
       <input
         className="size"
@@ -66,8 +67,8 @@ export function AttributeBar({ value, onChange, onStepSize, onDelete, onDone, cl
           <option key={s} value={s} />
         ))}
       </datalist>
-      <button onMouseDown={keepFocus} onClick={() => onStepSize(1)} title="Larger (Ctrl+Shift+.)">
-        +
+      <button onMouseDown={keepFocus} onClick={() => onStepSize(1)} title="Larger (Ctrl+Shift+.)" aria-label="Larger">
+        <Icon name="plus" size={14} />
       </button>
       <button
         onMouseDown={keepFocus}
@@ -101,8 +102,8 @@ export function AttributeBar({ value, onChange, onStepSize, onDelete, onDone, cl
       {onDelete && (
         <>
           <span className="sep" />
-          <button onMouseDown={keepFocus} onClick={onDelete} title="Delete (Del)">
-            Delete
+          <button className="danger" onMouseDown={keepFocus} onClick={onDelete} title="Delete (Del)" aria-label="Delete">
+            <Icon name="trash" size={16} />
           </button>
         </>
       )}

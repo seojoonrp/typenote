@@ -1,5 +1,6 @@
 // Color swatches, opacity slider and delete for a highlight (or the highlight tool defaults).
 import type { CSSProperties } from "react";
+import { Icon } from "../ui/Icon";
 import { useKeepInside } from "./floating";
 import { HIGHLIGHT_COLORS, type HighlightStyle } from "./highlightStyle";
 import { cssColor, hexToRgb, rgbToHex, sameColor } from "./style";
@@ -51,8 +52,8 @@ export function HighlightBar({ value, onChange, onDelete, className, style }: Pr
       {onDelete && (
         <>
           <span className="sep" />
-          <button onClick={onDelete} title="Delete (Del)">
-            Delete
+          <button className="danger" onClick={onDelete} title="Delete (Del)" aria-label="Delete">
+            <Icon name="trash" size={16} />
           </button>
         </>
       )}

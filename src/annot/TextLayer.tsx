@@ -10,18 +10,22 @@ import { textCss } from "./style";
 import { KEEP_DRAFT_ATTR, type Draft, type TextTool } from "./useTextTool";
 
 const DRAG_THRESHOLD_PX = 3;
-const BAR_HEIGHT_PX = 34;
+const BAR_HEIGHT_PX = 40;
+/** room between a floating bar and what it belongs to */
+const BAR_GAP_PX = 10;
 
 type Props = {
   view: PageView;
   tt: TextTool;
   faces: Faces;
-  /** select tool, click on no box: lets a highlight under the point take it (true = taken) */
-  onBackgroundClick?: (pt: { x: number; y: number }) => boolean;
+  /** select tool, press on no box (a drag selects page text, a click a highlight) */
+  onBackgroundPress?: (e: ReactPointerEvent<HTMLDivElement>, pt: { x: number; y: number }, toPage: (clientX: number, clientY: number) => { x: number; y: number }) => void;
+  /** select tool, double-click on no box (selects the word under it) */
+  onBackgroundDoubleClick?: (pt: { x: number; y: number }) => void;
 };
 type Drag = { id: string; dx: number; dy: number };
 
-export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
+export function TextLayer({ view, tt, faces, onBackgroundPress, onBackgroundDoubleClick }: Props) {
   const { page, scale } = view;
   const layerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -37,12 +41,12 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
     return { x: (clientX - r.left) / css / scale, y: (clientY - r.top) / css / scale };
   };
 
-  const onLayerDown = (e: ReactPointerEvent) => {
+  const onLayerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     if (tt.tool === "text") tt.beginNew(page, toPage(e.clientX, e.clientY));
     else {
       tt.select(null);
-      onBackgroundClick?.(toPage(e.clientX, e.clientY));
+      onBackgroundPress?.(e, toPage(e.clientX, e.clientY), toPage);
     }
   };
 
@@ -89,8 +93,8 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
   const barLayout = barBox && layoutText(barBox.text, faces[barBox.weight], barBox.size, barBox.tracking);
   let barTop = 0;
   if (barBox && barLayout) {
-    barTop = barBox.y * scale - BAR_HEIGHT_PX - 6;
-    if (barTop < 0) barTop = (barBox.y + barLayout.height) * scale + 6;
+    barTop = barBox.y * scale - BAR_HEIGHT_PX - BAR_GAP_PX;
+    if (barTop < 0) barTop = (barBox.y + barLayout.height) * scale + BAR_GAP_PX;
   }
 
   return (
@@ -98,6 +102,7 @@ export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
       ref={layerRef}
       className={`text-layer tool-${tt.tool}`}
       onPointerDown={onLayerDown}
+      onDoubleClick={(e) => tt.tool === "select" && onBackgroundDoubleClick?.(toPage(e.clientX, e.clientY))}
       // no focus change or text selection from clicks on the page (the editor places its caret itself)
       onMouseDown={(e) => !(e.target instanceof HTMLTextAreaElement) && e.preventDefault()}
     >

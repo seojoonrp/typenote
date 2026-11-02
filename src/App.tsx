@@ -6,8 +6,13 @@ import { pathKey, Tabs, type Tab } from "./doc/Tabs";
 import { PdfError } from "./pdf/client";
 import type { TextBoxInput } from "./pdf/engine/model";
 import { baseName, platform, type OpenedFile } from "./platform";
+import { Icon } from "./ui/Icon";
+import { LogoMark } from "./ui/Logo";
 import { Menu } from "./ui/Menu";
 import { TabBar } from "./ui/TabBar";
+
+/** The folder part of a path, for the second line of a recent file. */
+const dirName = (path: string) => path.slice(0, Math.max(0, path.length - baseName(path).length - 1));
 
 // one tab list for the app's lifetime (not per render: StrictMode double-invokes initializers).
 // The tabs' stores leave the window title alone; the shown document sets it.
@@ -161,57 +166,72 @@ export function App() {
     };
   }, [tabs, openPath]);
 
+  const recentItem = (p: string) => (
+    <button key={p} onClick={() => void openPath(p)} title={p}>
+      <Icon name="file" />
+      <span className="mi-label">
+        {baseName(p)}
+        <span className="mi-note">{dirName(p)}</span>
+      </span>
+    </button>
+  );
+
   const toolbarStart = (
     <>
-      <button onClick={() => void pick()} title="Open (Ctrl+O)">
-        Open
+      <button className="icon-button" onClick={() => void pick()} title="Open (Ctrl+O)" aria-label="Open">
+        <Icon name="open" />
       </button>
-      <Menu label="Recent ▾" disabled={recent.length === 0} wide>
-        {recent.map((p) => (
-          <button key={p} onClick={() => void openPath(p)} title={p}>
-            {baseName(p)}
-            <span className="dim">{p}</span>
-          </button>
-        ))}
+      <Menu label={<Icon name="recent" />} title="Recent files" disabled={recent.length === 0} wide>
+        {recent.map(recentItem)}
       </Menu>
     </>
   );
 
   const notice = error && (
     <div className="error" role="alert">
-      {error}
+      <Icon name="alert" size={16} />
+      <span className="error-text">{error}</span>
       <button onClick={() => setError(null)}>Dismiss</button>
     </div>
   );
 
   return (
     <div className="app">
-      {list.length > 0 && <TabBar tabs={list} activeId={activeId} onActivate={(t) => tabs.activate(t.id)} onClose={(t) => void closeTab(t)} />}
+      {list.length > 0 && (
+        <TabBar tabs={list} activeId={activeId} onActivate={(t) => tabs.activate(t.id)} onClose={(t) => void closeTab(t)} onOpen={() => void pick()} />
+      )}
       {active ? (
         <DocumentView key={active.id} tab={active} toolbarStart={toolbarStart} notice={notice} />
       ) : (
-        <>
-          <header className="toolbar">{toolbarStart}</header>
+        <main className="start">
           {notice}
-          <main className="start">
-            <button className="primary" onClick={() => void pick()} disabled={opening > 0}>
-              {opening > 0 ? "Opening…" : "Open PDF"}
-            </button>
-            <p className="dim">or drop a PDF file onto the window</p>
+          <div className="start-body">
+            <section className="start-hero">
+              <LogoMark size={72} />
+              <h1>typenote</h1>
+              <p className="tagline">Type and highlight on PDFs, with Hangul that stays intact everywhere.</p>
+              <button className="primary" onClick={() => void pick()} disabled={opening > 0}>
+                <Icon name="open" />
+                {opening > 0 ? "Opening…" : "Open PDF"}
+                {opening === 0 && <kbd>Ctrl+O</kbd>}
+              </button>
+              <p className="drop-hint">
+                <Icon name="drop" size={16} />
+                or drop a PDF anywhere in this window
+              </p>
+            </section>
             {recent.length > 0 && (
-              <ul className="recent">
-                {recent.map((p) => (
-                  <li key={p}>
-                    <button onClick={() => void openPath(p)} title={p}>
-                      {baseName(p)}
-                      <span className="dim">{p}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <section className="recent">
+                <h2>Recent</h2>
+                <ul>
+                  {recent.map((p) => (
+                    <li key={p}>{recentItem(p)}</li>
+                  ))}
+                </ul>
+              </section>
             )}
-          </main>
-        </>
+          </div>
+        </main>
       )}
     </div>
   );

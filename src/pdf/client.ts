@@ -90,6 +90,11 @@ export class PdfClient {
     return this.send<SelectTextResult>({ kind: "selectText", ...params }).promise;
   }
 
+  /** The page text of the same selection as `selectText`, for the clipboard. */
+  copyText(params: SelectTextParams): Promise<string> {
+    return this.send<string>({ kind: "copyText", ...params }).promise;
+  }
+
   /** The bytes to write to disk; the worker continues from them for the next save. */
   save(full = false): Promise<SaveResult> {
     return this.send<SaveResult>({ kind: "save", full }).promise;

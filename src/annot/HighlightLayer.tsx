@@ -11,7 +11,9 @@ import type { HighlightTool } from "./useHighlightTool";
 import type { Tool } from "./useTextTool";
 
 const DRAG_THRESHOLD_PX = 3;
-const BAR_HEIGHT_PX = 34;
+const BAR_HEIGHT_PX = 40;
+/** room between a floating bar and what it belongs to */
+const BAR_GAP_PX = 10;
 
 type Props = { view: PageView; ht: HighlightTool; tool: Tool; client: PdfClient };
 type Pt = [number, number];
@@ -106,8 +108,8 @@ export function HighlightLayer({ view, ht, tool, client }: Props) {
   let barLeft = 0;
   if (selected) {
     const b = quadsBounds(selected.quads);
-    barTop = b[1] * scale - BAR_HEIGHT_PX - 6;
-    if (barTop < 0) barTop = b[3] * scale + 6;
+    barTop = b[1] * scale - BAR_HEIGHT_PX - BAR_GAP_PX;
+    if (barTop < 0) barTop = b[3] * scale + BAR_GAP_PX;
     barLeft = Math.max(0, b[0] * scale);
   }
 

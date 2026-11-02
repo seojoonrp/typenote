@@ -6,14 +6,18 @@ import { AttributeBar } from "./annot/AttributeBar";
 import { useFaces } from "./annot/fonts";
 import { HighlightBar } from "./annot/HighlightBar";
 import { HighlightLayer } from "./annot/HighlightLayer";
+import { SelectionLayer } from "./annot/SelectionLayer";
 import { highlightAt } from "./annot/highlightStyle";
 import { TextLayer } from "./annot/TextLayer";
 import { useHighlightTool } from "./annot/useHighlightTool";
+import { useTextSelection } from "./annot/useTextSelection";
 import { useTextTool } from "./annot/useTextTool";
 import type { SaveOptions, SaveProblem } from "./doc/DocStore";
 import type { Tab, TabView } from "./doc/Tabs";
 import { platform } from "./platform";
+import { Icon } from "./ui/Icon";
 import { Menu } from "./ui/Menu";
+import { PageField } from "./viewer/PageField";
 import { Viewer, type ViewerHandle, type ZoomMode } from "./viewer/Viewer";
 import { ZoomField } from "./viewer/ZoomField";
 
@@ -68,6 +72,7 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
   const faces = useFaces();
   const tt = useTextTool(store, faces, page);
   const ht = useHighlightTool(store, page);
+  const ts = useTextSelection(client, page);
 
   // switching or closing tabs writes the text being typed first
   useEffect(() => {
@@ -87,9 +92,13 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
   useEffect(() => {
     if (highlightSelected) tt.select(null);
   }, [highlightSelected]); // only when a highlight gets selected (tt.select is not memoized)
+  // each tool shows only its own kind of selection (page text is selected with the select tool)
+  const { clear: clearTextSelection } = ts;
   useEffect(() => {
     if (tt.tool === "text") selectHighlight(null);
-  }, [tt.tool, selectHighlight]);
+    if (tt.tool === "highlight") tt.select(null);
+    if (tt.tool !== "select") clearTextSelection();
+  }, [tt.tool, selectHighlight, clearTextSelection]); // eslint-disable-line react-hooks/exhaustive-deps -- tt.select is not memoized
 
   // focus the pages so arrow keys / PageUp / PageDown work right away
   useEffect(() => viewerRef.current?.focus(), []);
@@ -145,59 +154,78 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
     <>
       <header className="toolbar">
         {toolbarStart}
-        <Menu label="Save ▾">
+        <Menu label={<Icon name="save" />} title="Save">
           <button onClick={() => save()}>
-            Save<span className="dim">Ctrl+S</span>
+            <Icon name="save" />
+            <span className="mi-label">Save</span>
+            <kbd>Ctrl+S</kbd>
           </button>
           <button onClick={() => save({ saveAs: true })}>
-            Save As…<span className="dim">Ctrl+Shift+S</span>
+            <Icon name="saveAs" />
+            <span className="mi-label">Save As…</span>
+            <kbd>Ctrl+Shift+S</kbd>
           </button>
           <button onClick={() => save({ full: true })}>
-            Save Compacted<span className="dim">Rewrites the file without its edit history, making it smaller</span>
+            <Icon name="compact" />
+            <span className="mi-label">
+              Save Compacted
+              <span className="mi-note">Rewrites the file without its edit history, making it smaller</span>
+            </span>
           </button>
         </Menu>
         <span className="sep" />
-        <button className={tt.tool === "select" ? "active" : ""} onClick={() => tt.setTool("select")} title="Select (V)">
-          Select
-        </button>
-        <button className={tt.tool === "text" ? "active" : ""} onClick={() => tt.setTool("text")} title="Text (T)">
-          Text
-        </button>
-        <button className={tt.tool === "highlight" ? "active" : ""} onClick={() => tt.setTool("highlight")} title="Highlight (H)">
-          Highlight
-        </button>
+        <div className="seg" role="radiogroup" aria-label="Tool">
+          {(
+            [
+              ["select", "select", "Select (V)"],
+              ["text", "text", "Text (T)"],
+              ["highlight", "highlight", "Highlight (H)"],
+            ] as const
+          ).map(([tool, icon, title]) => (
+            <button key={tool} role="radio" aria-checked={tt.tool === tool} className={tt.tool === tool ? "active" : ""} onClick={() => tt.setTool(tool)} title={title} aria-label={title}>
+              <Icon name={icon} />
+            </button>
+          ))}
+        </div>
         <span className="sep" />
-        <button onClick={() => void store.undo()} disabled={!state.canUndo} title="Undo (Ctrl+Z)">
-          ↶
+        <button className="icon-button" onClick={() => void store.undo()} disabled={!state.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
+          <Icon name="undo" />
         </button>
-        <button onClick={() => void store.redo()} disabled={!state.canRedo} title="Redo (Ctrl+Y)">
-          ↷
+        <button className="icon-button" onClick={() => void store.redo()} disabled={!state.canRedo} title="Redo (Ctrl+Y)" aria-label="Redo">
+          <Icon name="redo" />
         </button>
         {/* always present in the text tool, so selecting never reflows the toolbar (and the page);
             it edits the selected box or, with nothing selected, the tool defaults */}
+        {tt.tool !== "select" && <span className="sep" />}
         {tt.tool === "text" && <AttributeBar className="docked" value={tt.target} onChange={tt.setStyle} onStepSize={tt.stepSizeBy} />}
         {tt.tool === "highlight" && <HighlightBar className="docked" value={ht.target} onChange={ht.setStyle} />}
-        <SaveStatus saving={state.saving} dirty={state.dirty} lastSave={state.lastSave} />
         <span className="spacer" />
-        <span className="pages">
-          {page + 1} / {doc.info.pageCount}
-        </span>
-        <button onClick={() => viewerRef.current?.zoomOut()} title="Zoom Out (Ctrl+-)">
-          −
-        </button>
-        <ZoomField zoom={zoom.value} onCommit={(z) => viewerRef.current?.setZoom(z)} onDone={() => viewerRef.current?.focus()} />
-        <button onClick={() => viewerRef.current?.zoomIn()} title="Zoom In (Ctrl+=)">
-          +
-        </button>
-        <Menu label={zoom.mode === "fit-page" ? "Fit Page ▾" : zoom.mode === "fit-width" ? "Fit Width ▾" : "Fit ▾"} align="right">
+        <SaveStatus saving={state.saving} dirty={state.dirty} lastSave={state.lastSave} />
+        <PageField page={page} count={doc.info.pageCount} onGo={(p) => viewerRef.current?.goTo(p)} onDone={() => viewerRef.current?.focus()} />
+        <div className="zoom-group">
+          <button onClick={() => viewerRef.current?.zoomOut()} title="Zoom Out (Ctrl+-)" aria-label="Zoom out">
+            <Icon name="minus" size={16} />
+          </button>
+          <ZoomField zoom={zoom.value} onCommit={(z) => viewerRef.current?.setZoom(z)} onDone={() => viewerRef.current?.focus()} />
+          <button onClick={() => viewerRef.current?.zoomIn()} title="Zoom In (Ctrl+=)" aria-label="Zoom in">
+            <Icon name="plus" size={16} />
+          </button>
+        </div>
+        <Menu label={<Icon name={zoom.mode === "fit-page" ? "fitPage" : zoom.mode === "fit-width" ? "fitWidth" : "actualSize"} />} title="Fit" align="right">
           <button onClick={() => viewerRef.current?.setMode("fit-page")} className={zoom.mode === "fit-page" ? "active" : ""}>
-            Fit Page<span className="dim">Ctrl+0</span>
+            <Icon name="fitPage" />
+            <span className="mi-label">Fit Page</span>
+            <kbd>Ctrl+0</kbd>
           </button>
           <button onClick={() => viewerRef.current?.setMode("fit-width")} className={zoom.mode === "fit-width" ? "active" : ""}>
-            Fit Width<span className="dim">Ctrl+2</span>
+            <Icon name="fitWidth" />
+            <span className="mi-label">Fit Width</span>
+            <kbd>Ctrl+2</kbd>
           </button>
           <button onClick={() => viewerRef.current?.setZoom(1)}>
-            Actual Size (100%)<span className="dim">Ctrl+1</span>
+            <Icon name="actualSize" />
+            <span className="mi-label">Actual Size</span>
+            <kbd>Ctrl+1</kbd>
           </button>
         </Menu>
       </header>
@@ -206,7 +234,8 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
 
       {problem && (
         <div className="error" role="alert">
-          <span>
+          <Icon name="alert" size={16} />
+          <span className="error-text">
             {PROBLEM_TEXT[problem.kind]} <span className="dim">({problem.message})</span>
           </span>
           {(problem.kind === "locked" || problem.kind === "io" || problem.kind === "failed") && <button onClick={() => save()}>Retry</button>}
@@ -228,6 +257,7 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
         onOutsidePage={() => {
           tt.select(null);
           ht.select(null);
+          ts.clear();
         }}
         overlay={(view) =>
           faces && (
@@ -237,12 +267,23 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
                 view={view}
                 tt={tt}
                 faces={faces}
-                onBackgroundClick={(pt) => {
-                  const hit = highlightAt(ht.highlights.filter((h) => h.page === view.page), pt.x, pt.y);
-                  ht.select(hit?.id ?? null);
-                  return !!hit;
-                }}
+                onBackgroundPress={(e, pt, toPage) =>
+                  ts.press(
+                    e,
+                    [pt.x, pt.y],
+                    (x, y) => {
+                      const p = toPage(x, y);
+                      return [p.x, p.y];
+                    },
+                    () => {
+                      const hit = highlightAt(ht.highlights.filter((h) => h.page === view.page), pt.x, pt.y);
+                      ht.select(hit?.id ?? null);
+                    },
+                  )
+                }
+                onBackgroundDoubleClick={(pt) => ts.selectWord([pt.x, pt.y])}
               />
+              <SelectionLayer ts={ts} scale={view.scale} />
             </>
           )
         }
@@ -253,8 +294,9 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
 
 function SaveStatus({ saving, dirty, lastSave }: { saving: boolean; dirty: boolean; lastSave: { at: number } | null }) {
   let text = "";
-  if (saving) text = "Saving…";
-  else if (dirty) text = "Edited";
-  else if (lastSave) text = `Saved ${new Date(lastSave.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-  return <span className="save-status dim">{text}</span>;
+  let kind = "";
+  if (saving) [text, kind] = ["Saving…", "saving"];
+  else if (dirty) [text, kind] = ["Edited", "edited"];
+  else if (lastSave) [text, kind] = [`Saved ${new Date(lastSave.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`, "saved"];
+  return <span className={`save-status ${kind}`}>{text}</span>;
 }

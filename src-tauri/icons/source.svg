@@ -1,6 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <rect x="64" y="64" width="896" height="896" rx="180" fill="#1f3a8a"/>
-  <rect x="196" y="610" width="632" height="150" rx="24" fill="#ffd100"/>
-  <rect x="262" y="250" width="500" height="120" rx="20" fill="#ffffff"/>
-  <rect x="452" y="250" width="120" height="510" rx="20" fill="#ffffff"/>
+  <!-- typenote: a red tile, a white page with a folded corner, a red T over a highlighted line -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4454b"/>
+      <stop offset="1" stop-color="#c3111a"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.25" cy="0.15" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#tile)"/>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#sheen)"/>
+  <path d="M338 214H612L742 344V770Q742 826 686 826H338Q282 826 282 770V270Q282 214 338 214Z" fill="#7a0a10" opacity="0.28" transform="translate(10 18)"/>
+  <path d="M338 214H612L742 344V770Q742 826 686 826H338Q282 826 282 770V270Q282 214 338 214Z" fill="#ffffff"/>
+  <path d="M612 214V312Q612 344 644 344H742Z" fill="#f7b4b7"/>
+  <rect x="346" y="588" width="332" height="118" rx="20" fill="#ffc4c6"/>
+  <rect x="372" y="410" width="280" height="84" rx="16" fill="#d4161e"/>
+  <rect x="470" y="410" width="84" height="320" rx="16" fill="#d4161e"/>
 </svg>

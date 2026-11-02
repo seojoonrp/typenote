@@ -4,8 +4,8 @@ import { useLayoutEffect, useRef } from "react";
  * For a bar floating over the page at `left` px: shifts it left as far as needed to stay inside
  * the page (it would otherwise hang past the right edge). No-op for a bar without a left.
  */
-export function useKeepInside(left: unknown) {
-  const ref = useRef<HTMLDivElement>(null);
+export function useKeepInside<T extends HTMLElement = HTMLDivElement>(left: unknown) {
+  const ref = useRef<T>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el?.parentElement || typeof left !== "number") return;

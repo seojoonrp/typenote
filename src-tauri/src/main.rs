@@ -9,6 +9,7 @@ mod settings;
 use tauri::Manager;
 
 fn main() {
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))] // only the dev build changes it
     let mut context = tauri::generate_context!();
     // The dev build is a separate app (own single-instance lock, settings and WebView2 data),
     // so running it never hands files to, or shares a recent list with, an installed copy.

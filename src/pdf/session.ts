@@ -79,12 +79,13 @@ function pageText(index: number): PageText {
 /** pt of slack around a text line in which a press still counts as "on the text" */
 const LINE_SLOP = 1;
 
+const onText = (t: PageText, [x, y]: [number, number]) =>
+  t.lines.some((b) => x >= b[0] - LINE_SLOP && x <= b[2] + LINE_SLOP && y >= b[1] - LINE_SLOP && y <= b[3] + LINE_SLOP);
+
 /** Line quads of the selection, fitted to the letters' height (no band above and below them). */
 function selectText({ page, from, to, mode }: SelectTextParams): SelectTextResult {
   const t = pageText(page);
-  const [x, y] = from;
-  const onText = t.lines.some((b) => x >= b[0] - LINE_SLOP && x <= b[2] + LINE_SLOP && y >= b[1] - LINE_SLOP && y <= b[3] + LINE_SLOP);
-  if (!onText) return [];
+  if (!onText(t, from)) return [];
   let quads: Quad[];
   if (mode === "word") {
     const q = t.st.snap(from, from, "words") as Quad;
@@ -95,6 +96,18 @@ function selectText({ page, from, to, mode }: SelectTextParams): SelectTextResul
   if (quads.length === 0) return quads;
   t.glyphs ??= pageGlyphs(getPage(page));
   return fitQuadsToGlyphs(quads, t.glyphs);
+}
+
+/** The text of the same selection, for the clipboard. */
+function copyText({ page, from, to, mode }: SelectTextParams): string {
+  const t = pageText(page);
+  if (!onText(t, from)) return "";
+  if (mode === "word") {
+    const q = t.st.snap(from, from, "words") as Quad;
+    // from the middle of the word's left edge to the middle of its right edge
+    return t.st.copy([(q[0] + q[4]) / 2, (q[1] + q[5]) / 2], [(q[2] + q[6]) / 2, (q[3] + q[7]) / 2]);
+  }
+  return t.st.copy(from, to);
 }
 
 function closeDoc() {
@@ -281,6 +294,11 @@ export async function handle(msg: Request, reply: Reply) {
       case "selectText": {
         const { id, kind: _kind, ...params } = msg;
         reply({ id, ok: true, result: selectText(params) });
+        break;
+      }
+      case "copyText": {
+        const { id, kind: _kind, ...params } = msg;
+        reply({ id, ok: true, result: copyText(params) });
         break;
       }
       case "save": {

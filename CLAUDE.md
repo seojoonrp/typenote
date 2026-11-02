@@ -84,6 +84,15 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 쪽 위에 뜨는 막대들은 `useKeepInside`(`src/annot/floating.ts`)로 쪽 안에 들어오게 밀고, `.content`는 `overflow: clip`이라 무엇이 삐져나와도 가로 스크롤이 생기지 않는다.
 - 텍스트 상자: 윤곽선(`.tbox-edge`)은 텍스트 도구에서도 이동 손잡이이고, 상자 안을 클릭하면 `caretIndexAt`로 클릭한 위치에 커서를 놓는다. 편집 중인 textarea에서는 layer의 mousedown preventDefault를 하지 않는다(그래야 클릭으로 커서가 옮겨진다).
 
+## 디자인
+- 다크 네이비 바탕에 빨강 포인트. 색과 크기 값은 `src/styles.css` 맨 위의 토큰(`--bg-0`~`--bg-5`, `--line`, `--text`~`--text-3`, `--red`…)으로만 쓴다. 빨강은 **지금 켜져 있거나 누를 것**에만 쓴다: 선택된 도구, 보이는 탭의 윗줄, 주 버튼, 하이라이트 선택선, 저장 안 된 점. **텍스트 상자의 점선·실선·커서는 남색**(`--navy-line`, 사용자 요청)이고, 선택 도구로 고른 페이지 글자는 파랑이다. 페이지는 흰색 그대로 둔다(PDF 렌더와 하이라이트 Multiply가 흰 바탕을 전제로 한다).
+- UI 글꼴은 번들된 Pretendard(`"Pretendard UI"`, 400/600)다. overlay용 `TypenotePretendard` family와는 따로 등록한다. 500·700은 없으므로 쓰지 않는다(`font-synthesis: none`).
+- 아이콘은 `src/ui/Icon.tsx`의 선 아이콘(24 그리드, currentColor)만 쓴다. 버튼에 글자 대신 아이콘을 쓰면 `title`(단축키 포함)과 `aria-label`을 단다.
+- 로고는 빨간 둥근 사각형 위의 흰 문서(접힌 모서리)와 빨간 T, 그 아래 분홍 형광펜 띠다(PDF 앱 아이콘들을 레퍼런스로 함). `src-tauri/icons/source.svg`가 원본이고 `src/ui/Logo.tsx`가 같은 그림이다. 앱 아이콘은 `npx tauri icon src-tauri/icons/source.svg -o <임시 폴더>`로 만든 뒤 필요한 파일(32/64/128/128@2x png, icon.ico, icon.png)만 복사한다.
+- Windows는 exe 경로별로 아이콘을 캐시해서, 아이콘을 바꾼 버전을 덮어 설치해도 작업 표시줄에 옛 아이콘이 남는다. 설치 파일이 끝에 `ie4uinit -show`로 캐시를 새로 고친다(`src-tauri/windows/hooks.nsh`, `installerHooks`).
+- 탭 띠 40px, 툴바 48px로 높이를 고정한다(한 줄 고정 규칙). 크롬 위 메뉴는 `--shadow-pop`, 페이지 위 작은 것(스크롤 쪽 번호, 경고)은 `--shadow-float`. **입력 중 속성 바와 하이라이트 팝오버에는 그림자가 없다**(쓰는 글자를 가렸음). 속성 바 위치 계산(`BAR_HEIGHT_PX`)은 CSS 높이(40px)와 맞춘다.
+- 창은 `tauri.conf.json`의 `theme: "Dark"`, `backgroundColor`로 제목 표시줄과 첫 화면부터 어둡게 한다.
+
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키·Enter·Esc 처리 금지.
 - 확정은 Esc 또는 바깥 클릭. 빈 상자는 확정 시 자동 삭제.
