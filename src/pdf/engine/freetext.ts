@@ -68,7 +68,7 @@ export const userRectToPage = (ctm: mupdf.Matrix, r: mupdf.Rect) => normalize(mu
 
 /** The /AP /N stream (picking /AS state if /N is a dict of states). */
 export function normalAppearance(annot: mupdf.PDFObject): mupdf.PDFObject | null {
-  const n = annot.get("AP").get("N");
+  const n = annot.get("AP", "N");
   if (n.isNull()) return null;
   if (n.isStream()) return n;
   const as = annot.get("AS");
@@ -161,7 +161,7 @@ export function findSharedFonts(doc: mupdf.PDFDocument): Partial<Record<Weight, 
   const out: Partial<Record<Weight, mupdf.PDFObject>> = {};
   for (const { annot } of locateAppFreeTexts(doc)) {
     const da = parseDA(annot.get("DA").isString() ? annot.get("DA").asString() : "");
-    const font = da && normalAppearance(annot)?.get("Resources").get("Font").get(da.resName);
+    const font = da && normalAppearance(annot)?.get("Resources", "Font", da.resName);
     if (da && font?.isIndirect()) out[da.weight] ??= font;
   }
   return out;
@@ -198,7 +198,7 @@ export function writeFreeText(
   const now = pdfDate();
 
   if (existing) {
-    const form = existing.get("AP").get("N");
+    const form = existing.get("AP", "N");
     form.writeStream(content);
     for (const [k, v] of Object.entries(formDict)) form.put(k, v);
     existing.put("Rect", rect);
@@ -244,7 +244,7 @@ export function removeFreeText(doc: mupdf.PDFDocument, { page, annot }: LocatedF
   for (let i = annots.length - 1; i >= 0; i--) {
     if (annots.get(i).asIndirect() === num) annots.delete(i);
   }
-  const ap = annot.get("AP").get("N");
+  const ap = annot.get("AP", "N");
   if (ap.isIndirect()) doc.deleteObject(ap.asIndirect());
   doc.deleteObject(num);
 }

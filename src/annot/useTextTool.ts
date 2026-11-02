@@ -5,7 +5,7 @@ import type { Faces } from "../pdf/engine/faces";
 import { newBoxId, type TextBox } from "../pdf/engine/model";
 import { clampSize, DEFAULT_STYLE, newBoxOrigin, stepSize, type BoxStyle } from "./style";
 
-export type Tool = "select" | "text";
+export type Tool = "select" | "text" | "highlight";
 /** The box being typed into (new or existing), not written to the document until committed. */
 export type Draft = TextBox & { isNew: boolean };
 
@@ -18,7 +18,7 @@ type Prefs = { tool: Tool; style: BoxStyle };
 function loadPrefs(): Prefs {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "null") as Prefs | null;
-    if (p && (p.tool === "select" || p.tool === "text") && p.style?.size > 0) return p;
+    if (p && ["select", "text", "highlight"].includes(p.tool) && p.style?.size > 0) return p;
   } catch {
     // unreadable storage: defaults
   }
@@ -164,6 +164,7 @@ export function useTextTool(store: DocStore, faces: Faces | null, page: number) 
       if (e.altKey || e.metaKey || isEditable(e.target)) return;
       if (!e.shiftKey && e.code === "KeyV") updatePrefs({ tool: "select" });
       else if (!e.shiftKey && e.code === "KeyT") updatePrefs({ tool: "text" });
+      else if (!e.shiftKey && e.code === "KeyH") updatePrefs({ tool: "highlight" });
       else if (s.selected) {
         const box = s.selected;
         const step = e.shiftKey ? 10 : 1;

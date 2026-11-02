@@ -4,6 +4,7 @@
 //   | {"ps": "PowerShell script"}  (runs in the background, e.g. to lock the file from another process)
 //   | {"click": "js expr -> [clientX, clientY]", "count"?: 2, "mods"?: 8}   real mouse events
 //   | {"drag": {"from": "js expr", "to": "js expr"}, "mods"?: 0}
+//   | {"press": "js expr"} | {"move": "js expr"} | {"release": "js expr"}   a drag in pieces
 //   | {"key": "Escape", "mods"?: 2, "composing"?: true}   (mods: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift)
 // Every step may have a "label".
 import fs from "node:fs";
@@ -100,6 +101,15 @@ for (const step of steps) {
     }
     await mouse("mouseReleased", to, { clickCount: 1 });
     console.log(label ?? "drag", from.map(Math.round).join(","), "->", to.map(Math.round).join(","));
+  } else if (step.press || step.move || step.release) {
+    const at = await evaluate(step.press ?? step.move ?? step.release);
+    if (step.press) {
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0], y: at[1] });
+      await mouse("mousePressed", at, { clickCount: 1 });
+    } else if (step.move) {
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at[0], y: at[1], button: "left", buttons: 1 });
+    } else await mouse("mouseReleased", at, { clickCount: 1 });
+    console.log(label ?? (step.press ? "press" : step.move ? "move" : "release"), "at", at.map(Math.round).join(","));
   } else if (step.key) {
     const [code, vk, text] = keyInfo(step.key);
     const modifiers = step.mods ?? 0;

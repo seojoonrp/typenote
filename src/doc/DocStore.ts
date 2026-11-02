@@ -1,13 +1,14 @@
-// The open document as the UI sees it: text boxes, undo history, unsaved state, saving and
-// autosave. Plain class (no React) so the logic can be tested with fake worker and platform.
+// The open document as the UI sees it: text boxes, highlights, undo history, unsaved state,
+// saving and autosave. Plain class (no React) so the logic can be tested with fake worker and
+// platform.
 //
 // Edits are optimistic: the UI state changes at once (a dropped box must not jump back while
 // the worker writes it) and the worker result only fills in the object number. The worker
 // handles messages in order, so a later save always includes every edit made before it.
 import type { SaveMode } from "../pdf/engine/editor";
-import { newBoxId, type TextBox, type TextBoxInput } from "../pdf/engine/model";
+import { newBoxId, type Highlight, type HighlightInput, type TextBox, type TextBoxInput } from "../pdf/engine/model";
 import type { PdfClient } from "../pdf/client";
-import type { DocInfo, PutTextBoxResult } from "../pdf/protocol";
+import type { DocInfo, PutHighlightResult, PutTextBoxResult } from "../pdf/protocol";
 import { baseName, SaveError, type FileStamp, type OpenedFile, type Platform, type SaveErrorKind } from "../platform/types";
 
 /** Autosave this long after the last edit. */
@@ -23,6 +24,7 @@ export type SaveProblem = { kind: SaveErrorKind | "failed"; message: string };
 export type DocState = {
   doc: OpenDoc | null;
   textBoxes: TextBox[];
+  highlights: Highlight[];
   /** edits not on disk yet */
   dirty: boolean;
   saving: boolean;
@@ -41,10 +43,15 @@ export type EditOptions = {
   merge?: string;
 };
 
-/** One undo step: the box before and after (null = did not exist). */
-type Command = { before: TextBox | null; after: TextBox | null; merge?: string; at: number };
+/** The annotation lists, by state key. */
+type Items = { textBoxes: TextBox; highlights: Highlight };
+type Kind = keyof Items;
+type Item = Items[Kind];
 
-type Client = Pick<PdfClient, "open" | "putTextBox" | "deleteTextBox" | "save">;
+/** One undo step: the annotation before and after (null = did not exist). */
+type Command = { kind: Kind; before: Item | null; after: Item | null; merge?: string; at: number };
+
+type Client = Pick<PdfClient, "open" | "putTextBox" | "deleteTextBox" | "putHighlight" | "deleteHighlight" | "save">;
 type Host = Pick<Platform, "writePdf" | "pickSavePath" | "addRecentFile" | "setTitle">;
 
 export type SaveOptions = { full?: boolean; saveAs?: boolean; overwrite?: boolean };
@@ -53,6 +60,7 @@ export class DocStore {
   private state: DocState = {
     doc: null,
     textBoxes: [],
+    highlights: [],
     dirty: false,
     saving: false,
     saveProblem: null,
@@ -97,10 +105,11 @@ export class DocStore {
     this.editVersion = this.savedVersion = 0;
     this.undoStack = [];
     this.redoStack = [];
-    const { textBoxes, ...info } = r;
+    const { textBoxes, highlights, ...info } = r;
     this.set({
       doc: { info, name: file.name, path: file.path },
       textBoxes,
+      highlights,
       dirty: false,
       saving: false,
       saveProblem: null,
@@ -113,80 +122,112 @@ export class DocStore {
 
   // --- edits -------------------------------------------------------------------------------
   /** Creates (no id) or updates a text box. Resolves to null if the worker rejected it (rolled back). */
-  async putTextBox(input: TextBoxInput, opts: EditOptions = {}): Promise<PutTextBoxResult | null> {
-    const id = input.id ?? newBoxId();
-    const before = this.find(id);
-    const box: TextBox = { ...input, id, objNum: before?.objNum };
-    const cmd = opts.record === false ? null : this.record(before, box, opts.merge);
-    this.applyLocal(id, box);
-    try {
-      const { objNum: _objNum, ...rest } = box;
+  putTextBox(input: TextBoxInput, opts: EditOptions = {}): Promise<PutTextBoxResult | null> {
+    const box = { ...input, id: input.id ?? newBoxId() };
+    return this.put("textBoxes", box, opts, async ({ objNum: _o, ...rest }) => {
       const r = await this.client.putTextBox(rest);
-      this.setObjNum(id, r.box.objNum);
-      return r;
-    } catch (e) {
-      this.rollback(id, before, cmd, e);
-      return null;
-    }
+      return { objNum: r.box.objNum, result: r };
+    });
   }
 
-  async deleteTextBox(id: string, opts: EditOptions = {}): Promise<void> {
-    const before = this.find(id);
-    if (!before) return;
-    const cmd = opts.record === false ? null : this.record(before, null);
-    this.applyLocal(id, null);
-    try {
-      await this.client.deleteTextBox(id);
-    } catch (e) {
-      this.rollback(id, before, cmd, e);
-    }
+  deleteTextBox(id: string, opts: EditOptions = {}): Promise<void> {
+    return this.remove("textBoxes", id, opts, () => this.client.deleteTextBox(id));
+  }
+
+  /** Creates or updates (color, opacity) a highlight. Resolves to null if the worker rejected it. */
+  putHighlight(input: HighlightInput, opts: EditOptions = {}): Promise<PutHighlightResult | null> {
+    return this.put("highlights", input, opts, async ({ objNum: _o, ...rest }) => {
+      const r = await this.client.putHighlight(rest);
+      return { objNum: r.highlight.objNum, result: r };
+    });
+  }
+
+  deleteHighlight(id: string, opts: EditOptions = {}): Promise<void> {
+    return this.remove("highlights", id, opts, () => this.client.deleteHighlight(id));
   }
 
   async undo() {
     const cmd = this.undoStack.pop();
     if (!cmd) return;
     this.redoStack.push(cmd);
-    await this.restore(cmd.before, (cmd.after ?? cmd.before)!.id);
+    await this.restore(cmd.kind, cmd.before, (cmd.after ?? cmd.before)!.id);
   }
 
   async redo() {
     const cmd = this.redoStack.pop();
     if (!cmd) return;
     this.undoStack.push(cmd);
-    await this.restore(cmd.after, (cmd.after ?? cmd.before)!.id);
+    await this.restore(cmd.kind, cmd.after, (cmd.after ?? cmd.before)!.id);
   }
 
-  private async restore(box: TextBox | null, id: string) {
-    if (box) await this.putTextBox(box, { record: false });
-    else await this.deleteTextBox(id, { record: false });
+  private async restore(kind: Kind, item: Item | null, id: string) {
+    const opts = { record: false };
+    if (kind === "textBoxes") await (item ? this.putTextBox(item as TextBox, opts) : this.deleteTextBox(id, opts));
+    else await (item ? this.putHighlight(item as Highlight, opts) : this.deleteHighlight(id, opts));
   }
 
-  private find(id: string): TextBox | null {
-    return this.state.textBoxes.find((b) => b.id === id) ?? null;
+  private async put<K extends Kind, R>(
+    kind: K,
+    input: Omit<Items[K], "objNum">,
+    opts: EditOptions,
+    send: (item: Items[K]) => Promise<{ objNum: number | undefined; result: R }>,
+  ): Promise<R | null> {
+    const before = this.find(kind, input.id);
+    const item = { ...input, objNum: before?.objNum } as Items[K];
+    const cmd = opts.record === false ? null : this.record(kind, before, item, opts.merge);
+    this.applyLocal(kind, input.id, item);
+    try {
+      const r = await send(item);
+      this.setObjNum(kind, input.id, r.objNum);
+      return r.result;
+    } catch (e) {
+      this.rollback(kind, input.id, before, cmd, e);
+      return null;
+    }
   }
 
-  private record(before: TextBox | null, after: TextBox | null, merge?: string): Command {
+  private async remove(kind: Kind, id: string, opts: EditOptions, send: () => Promise<unknown>) {
+    const before = this.find(kind, id);
+    if (!before) return;
+    const cmd = opts.record === false ? null : this.record(kind, before, null);
+    this.applyLocal(kind, id, null);
+    try {
+      await send();
+    } catch (e) {
+      this.rollback(kind, id, before, cmd, e);
+    }
+  }
+
+  private list(kind: Kind): Item[] {
+    return this.state[kind];
+  }
+
+  private find<K extends Kind>(kind: K, id: string): Items[K] | null {
+    return (this.list(kind).find((b) => b.id === id) as Items[K] | undefined) ?? null;
+  }
+
+  private record(kind: Kind, before: Item | null, after: Item | null, merge?: string): Command {
     const now = Date.now();
     const last = this.undoStack.at(-1);
     this.redoStack = [];
-    if (merge && last?.merge === merge && now - last.at < MERGE_MS) {
+    if (merge && last?.kind === kind && last.merge === merge && now - last.at < MERGE_MS) {
       last.after = after;
       last.at = now;
       return last;
     }
-    const cmd: Command = { before, after, merge, at: now };
+    const cmd: Command = { kind, before, after, merge, at: now };
     this.undoStack.push(cmd);
     return cmd;
   }
 
-  private applyLocal(id: string, box: TextBox | null) {
-    const list = this.state.textBoxes;
+  private applyLocal(kind: Kind, id: string, item: Item | null) {
+    const list = this.list(kind);
     // replace in place: the list order is the stacking order on the page
-    let textBoxes = box ? list.map((b) => (b.id === id ? box : b)) : list.filter((b) => b.id !== id);
-    if (box && !list.some((b) => b.id === id)) textBoxes = [...list, box];
+    let next = item ? list.map((b) => (b.id === id ? item : b)) : list.filter((b) => b.id !== id);
+    if (item && !list.some((b) => b.id === id)) next = [...list, item];
     this.editVersion++;
     this.set({
-      textBoxes,
+      [kind]: next,
       dirty: true,
       canUndo: this.undoStack.length > 0,
       canRedo: this.redoStack.length > 0,
@@ -195,17 +236,17 @@ export class DocStore {
     this.schedule(AUTOSAVE_DELAY_MS);
   }
 
-  private setObjNum(id: string, objNum: number | undefined) {
-    const box = this.find(id);
-    if (!box || box.objNum === objNum) return;
-    this.set({ textBoxes: this.state.textBoxes.map((b) => (b.id === id ? { ...b, objNum } : b)) });
+  private setObjNum(kind: Kind, id: string, objNum: number | undefined) {
+    const item = this.find(kind, id);
+    if (!item || item.objNum === objNum) return;
+    this.set({ [kind]: this.list(kind).map((b) => (b.id === id ? { ...b, objNum } : b)) });
   }
 
-  private rollback(id: string, before: TextBox | null, cmd: Command | null, e: unknown) {
+  private rollback(kind: Kind, id: string, before: Item | null, cmd: Command | null, e: unknown) {
     if (cmd && this.undoStack.at(-1) === cmd) this.undoStack.pop();
-    const rest = this.state.textBoxes.filter((b) => b.id !== id);
+    const rest = this.list(kind).filter((b) => b.id !== id);
     this.set({
-      textBoxes: before ? [...rest, before] : rest,
+      [kind]: before ? [...rest, before] : rest,
       canUndo: this.undoStack.length > 0,
       editError: e instanceof Error ? e.message : String(e),
     });
@@ -260,7 +301,8 @@ export class DocStore {
       const dirty = this.editVersion !== this.savedVersion;
       this.set({
         doc: newFile ? { ...doc, path, name: baseName(path) } : doc,
-        textBoxes: this.mergeObjNums(r.textBoxes),
+        textBoxes: this.mergeObjNums("textBoxes", r.textBoxes),
+        highlights: this.mergeObjNums("highlights", r.highlights),
         dirty,
         saving: false,
         saveProblem: null,
@@ -278,9 +320,9 @@ export class DocStore {
   }
 
   /** Keeps boxes edited during the save; refreshes object numbers (a full save renumbers). */
-  private mergeObjNums(saved: TextBox[]): TextBox[] {
+  private mergeObjNums<K extends Kind>(kind: K, saved: Items[K][]): Items[K][] {
     const byId = new Map(saved.map((b) => [b.id, b]));
-    return this.state.textBoxes.map((b) => ({ ...b, objNum: byId.get(b.id)?.objNum ?? b.objNum }));
+    return (this.state[kind] as Items[K][]).map((b) => ({ ...b, objNum: byId.get(b.id)?.objNum ?? b.objNum }));
   }
 
   dismissProblem() {

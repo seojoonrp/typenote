@@ -15,7 +15,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `/Contents`(UTF-16BE + BOM)가 재편집·복구의 source of truth. 앱 소유 FreeText는 `/NM` 고정 접두사로 식별.
 - 글자 → GID는 cmap lookup만 (shaping 없음, kerning 없음, advance = hmtx). **폰트 파일마다 GID 매핑을 따로** 한다.
 - subset은 hb-subset + **RETAIN_GIDS** (CID = 원본 GID). 저장마다 문서 전체 사용 글자 합집합으로 weight별 subset을 다시 만들어 **같은 객체 번호에 덮어쓴다** → 기존 AP 수정 불필요.
-- Highlight는 MuPDF annot API 사용 가능 (createAnnotation("Highlight") → setQuadPoints → setColor → update()). quad는 `StructuredText.highlight()` 결과 그대로. AP blend mode가 Multiply가 아니면 AP 직접 생성. 기본 노랑 = Acrobat의 /C 값.
+- Highlight도 raw 객체로 직접 쓴다: 평평한 직사각형 AP, `/BM /Multiply`, 불투명도(`/CA`, 기본 40%). quad는 `StructuredText.highlight()` 결과 그대로. 기본 색은 청록, 스와치의 노랑 = Acrobat의 /C 값.
 - 좌표: 앱 내부는 MuPDF page space (좌상단 원점, y-down, /Rotate·CropBox 반영). raw 객체에 쓰는 /Rect 등은 `page.getTransform()`으로 PDF user space로 변환. 회전 페이지 AP는 /Matrix에 회전 포함.
 - 렌더: base bitmap(MuPDF, 앱 주석은 `setHiddenForEditing(true)`) + HTML annot overlay + 편집용 `<textarea>`의 3레이어.
 - overlay는 같은 TTF를 FontFace로 weight 400/600 등록, `font-kerning: none`, AP와 같은 line-height.
@@ -59,6 +59,14 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 실제 WebView2 동작은 `tools/run-app.ps1`(DevTools 프로토콜 포트 9222)로 검증한다. 키 입력, 휠, `Input.synthesizePinchGesture`, 스크린샷을 OS 입력 없이 재현할 수 있다. 디버그 빌드는 dev 서버(1420)를 띄우므로 `npm run dev`를 먼저 켠다. 저장 시나리오는 `tools/save-test.mjs`로 만든다. 단계 파일 안의 경로는 슬래시(`/`)로 쓴다(Git Bash의 `node -e`가 `\\`를 먹는다).
 - worker에서 mupdf는 **동적 import**한다. mupdf가 top-level await를 쓰기 때문에, 정적 import를 쓰면 로드되는 동안 들어온 메시지가 리스너 등록 전에 버려진다(`src/pdf/worker.ts`).
 
+## 하이라이트 구조 (Phase 4)
+- 엔진은 `src/pdf/engine/highlight.ts`. **Highlight에도 PDFAnnotation setter + `update()`를 쓰지 않는다**(MuPDF가 AP를 자기 모양으로 다시 만든다). AP는 바깥 Form(`/GS gs /Fm Do`, ExtGState `BM Multiply`, `CA`/`ca`)이 안쪽 transparency group Form(quad 채우기)을 그리는 구조다. 고칠 때는 annot 객체 번호를 유지하고 옛 /N을 지운다. 지울 때는 /Popup도 함께 지운다.
+- 출처와 상관없이 모든 하이라이트를 import한다. id는 `/NM`, 없으면 `obj:<번호>`. base 비트맵은 하이라이트를 모두 숨기고(`HIDDEN.highlights`), `src/annot/HighlightLayer.tsx`가 하이라이트마다 SVG 하나를 `mix-blend-mode: multiply` + `opacity`로 그린다. AP와 같은 합성 방식이어서 실측 차이는 경계 ≤1 device px, 색 ≤3/255다.
+- 글자 선택은 worker의 `selectText`다. 드래그는 `StructuredText.highlight(from, to)`, 더블클릭은 `snap(p, p, "words")`를 쓴다(`highlight(p, p)`는 빈 배열). 시작점이 글자 줄 bbox 밖이면 빈 결과를 돌려준다(빈 곳과 스캔본에서는 동작하지 않음. `snap`은 빈 곳에서도 엉뚱한 quad를 돌려준다). 쪽별 StructuredText는 캐시한다.
+- mupdf `PDFObject`: 없는 키에 `.get("A").get("B")`처럼 이어 부르면 예외가 난다. **경로 형식 `obj.get("A", "B")`를 쓴다.** PDF real은 float32로 돌아오므로 모델로 읽을 때 반올림한다.
+- `DocStore`는 텍스트 상자와 하이라이트를 **한 undo 스택**에서 다룬다(명령에 `kind`). 선택은 둘 중 하나만 된다(`App.tsx`).
+- 실제 앱 시나리오는 `tools/highlight-test.mjs`, overlay와 AP 비교는 `tools/highlight-compare.mjs`로 돌린다.
+
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키·Enter·Esc 처리 금지.
 - 확정은 Esc 또는 바깥 클릭. 빈 상자는 확정 시 자동 삭제.
@@ -68,7 +76,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - `fonts/` Pretendard TTF (원본, 수정 금지)
 - `samples/` 테스트용 PDF (원본, 수정 금지. 결과물은 다른 폴더에 쓴다)
 - `spike/` Phase 0 Node 스크립트와 결과(`spike/out/`), `spike/REPORT.md`
-- `src/` 프런트엔드: `pdf/`(worker 셸, 세션, 클라이언트), `pdf/engine/`(FreeText, 폰트, subset, 저장 엔진), `doc/`(DocStore: 상태, undo, 저장), `annot/`(텍스트 상자 overlay, 편집, 속성 바, 도구 상태), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
+- `src/` 프런트엔드: `pdf/`(worker 셸, 세션, 클라이언트), `pdf/engine/`(FreeText, 폰트, subset, 저장 엔진), `doc/`(DocStore: 상태, undo, 저장), `annot/`(텍스트 상자와 하이라이트 overlay, 편집, 속성 바, 도구 상태), `viewer/`(한 쪽 레이아웃, 쪽 이동, 줌, 렌더 캐시), `platform/`(Tauri와 브라우저 대체 구현)
 - `tools/` 실제 WebView2 검증 도구(CDP 클라이언트, 실행 스크립트, 단계 파일과 생성기)
 - `src-tauri/` Rust 백엔드: `files.rs`(읽기, 원자적 쓰기, 잠김·충돌 판별, 실행 인자), `settings.rs`(settings.json, 최근 파일)
 

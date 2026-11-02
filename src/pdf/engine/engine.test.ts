@@ -7,7 +7,7 @@ import { shownText } from "./content";
 import { PdfEditor } from "./editor";
 import { makeFaces, type FontKit } from "./fonts";
 import { locateAppFreeTexts, normalAppearance } from "./freetext";
-import type { TextBox, TextBoxInput } from "./model";
+import { newHighlightId, type Quad, type RGB, type TextBox, type TextBoxInput } from "./model";
 import { createSubsetter } from "./subset";
 import { parseToUnicode } from "./tounicode";
 import { parseTTF } from "./ttf";
@@ -290,5 +290,115 @@ describe("PdfEditor", () => {
     expect(full.mode).toBe("full");
     expect(full.bytes.length).toBeLessThan(inc.bytes.length);
     expect(new PdfEditor(new mupdf.PDFDocument(full.bytes), loadKit).textBoxes()).toHaveLength(5);
+  });
+});
+
+describe("highlights", () => {
+  const CYAN: RGB = [0.219604, 0.898041, 1];
+
+  /** quads of the base text line on a page, as the UI gets them from StructuredText */
+  function lineQuads(doc: mupdf.PDFDocument, page: number): Quad[] {
+    const st = doc.loadPage(page).toStructuredText("preserve-whitespace");
+    let box: mupdf.Rect | null = null;
+    st.walk({ beginLine: (b) => void (box ??= b) });
+    const [x0, y0, x1, y1] = box!;
+    return st.highlight([x0 + 0.5, (y0 + y1) / 2], [x1 - 0.5, (y0 + y1) / 2]) as Quad[];
+  }
+
+  const expectQuads = (a: Quad[], b: Quad[]) => {
+    expect(a).toHaveLength(b.length);
+    a.forEach((q, i) => q.forEach((v, k) => expect(v).toBeCloseTo(b[i]![k]!, 3)));
+  };
+
+  it("creates highlights that read back in page space, drawn with Multiply at their opacity", async () => {
+    const ed = open(fixture());
+    const quads = lineQuads(ed.doc, 0);
+    expect(quads.length).toBe(1);
+    const empty: Quad = [100, 300, 200, 300, 100, 330, 200, 330]; // no text under it, to check the color
+    const id = newHighlightId();
+    ed.putHighlight({ id, page: 0, quads: [...quads, empty], color: CYAN, opacity: 0.4 });
+    const doc = new mupdf.PDFDocument((await ed.save()).bytes);
+
+    const [h] = new PdfEditor(doc, loadKit).highlights();
+    expect(h).toMatchObject({ id, page: 0, color: CYAN, opacity: 0.4 });
+    expectQuads(h!.quads, [...quads, empty]);
+
+    const annot = doc.newIndirect(h!.objNum!);
+    const qp = annot.get("QuadPoints");
+    expect(qp.get(1).asNumber()).toBeGreaterThan(qp.get(5).asNumber()); // UL above LL in user space
+    const ap = annot.get("AP").get("N");
+    expect(ap.get("Resources").get("ExtGState").get("GS").get("BM").asName()).toBe("Multiply");
+    expect(ap.get("Resources").get("ExtGState").get("GS").get("ca").asNumber()).toBeCloseTo(0.4);
+    expect(ap.get("Resources").get("XObject").get("Fm").get("Group").get("S").asName()).toBe("Transparency");
+
+    // white × (1 − 0.4·(1 − c)) in the middle of the empty quad
+    const pix = doc.loadPage(0).toPixmap(mupdf.Matrix.identity, mupdf.ColorSpace.DeviceRGB, false, true);
+    const px = pix.getPixels();
+    const at = 315 * pix.getStride() + 150 * pix.getNumberOfComponents();
+    CYAN.forEach((c, i) => expect(Math.abs(px[at + i]! - 255 * (1 - 0.4 * (1 - c)))).toBeLessThan(4));
+  });
+
+  it("keeps quads on rotated pages", async () => {
+    const ed = open(fixture());
+    for (const page of [1, 2]) {
+      const quads = lineQuads(ed.doc, page);
+      ed.putHighlight({ id: newHighlightId(), page, quads, color: CYAN, opacity: 1 });
+      const read = new PdfEditor(new mupdf.PDFDocument((await ed.save()).bytes), loadKit).highlights().filter((h) => h.page === page);
+      expectQuads(read[0]!.quads, quads);
+    }
+  });
+
+  it("changes color and opacity in place", async () => {
+    const ed = open(fixture());
+    const quads = lineQuads(ed.doc, 0);
+    const first = ed.putHighlight({ id: newHighlightId(), page: 0, quads, color: CYAN, opacity: 0.4 }).highlight;
+    const again = ed.putHighlight({ ...first, color: [1, 0.819611, 0], opacity: 0.7 }).highlight;
+    expect(again.objNum).toBe(first.objNum);
+    const doc = new mupdf.PDFDocument((await ed.save()).bytes);
+    expect(new PdfEditor(doc, loadKit).highlights()).toMatchObject([{ id: first.id, color: [1, 0.819611, 0], opacity: 0.7 }]);
+    expect(doc.newIndirect(first.objNum!).get("AP").get("N").get("Resources").get("ExtGState").get("GS").get("CA").asNumber()).toBeCloseTo(0.7);
+  });
+
+  it("imports another program's highlight and deletes it together with its popup", async () => {
+    const doc = new mupdf.PDFDocument(fixture());
+    const page = doc.findPage(0);
+    const annot = doc.addObject({
+      Type: "Annot",
+      Subtype: "Highlight",
+      Rect: [56, 770, 160, 790],
+      QuadPoints: [56, 790, 160, 790, 56, 770, 160, 770],
+      C: [0.219604, 0.898041, 1],
+      CA: 0.399994,
+      NM: "(741bdd99-996f-438e-b1a7-764585fb2abe)",
+      F: 4,
+      P: page,
+    });
+    const popup = doc.addObject({ Type: "Annot", Subtype: "Popup", Rect: [600, 700, 780, 800], Parent: annot });
+    annot.put("Popup", popup);
+    page.put("Annots", [annot, popup]);
+    const ed = open(doc.saveToBuffer("").asUint8Array().slice());
+
+    const [h] = ed.highlights();
+    expect(h).toMatchObject({ id: "741bdd99-996f-438e-b1a7-764585fb2abe", opacity: 0.399994 });
+    expect(h!.quads[0]![1]).toBeCloseTo(842 - 790); // page space: y down
+    expect(ed.deleteHighlight(h!.id)).toBe(0);
+    const saved = new mupdf.PDFDocument((await ed.save()).bytes);
+    expect(saved.findPage(0).get("Annots").length).toBe(0);
+  });
+
+  it("highlights without /NM get an obj: id and can still be edited and deleted", async () => {
+    const doc = new mupdf.PDFDocument(fixture());
+    const page = doc.loadPage(0);
+    const a = page.createAnnotation("Highlight");
+    a.setQuadPoints([[56, 60, 150, 60, 56, 75, 150, 75]]);
+    a.setColor([1, 1, 0]);
+    a.update();
+    const ed = open(doc.saveToBuffer("").asUint8Array().slice());
+    const [h] = ed.highlights();
+    expect(h!.id).toBe(`obj:${h!.objNum}`);
+    expect(h!.opacity).toBe(1);
+    expect(ed.putHighlight({ ...h!, color: CYAN }).highlight.objNum).toBe(h!.objNum);
+    expect(ed.deleteHighlight(h!.id)).toBe(0);
+    expect(ed.highlights()).toEqual([]);
   });
 });

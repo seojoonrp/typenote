@@ -23,3 +23,24 @@ export type TextBoxInput = Omit<TextBox, "id" | "objNum"> & { id?: string };
 export const NM_PREFIX = "typenote-";
 
 export const newBoxId = () => `${NM_PREFIX}${crypto.randomUUID()}`;
+
+/** Four corners in MuPDF page space, in the order UL, UR, LL, LR (as StructuredText returns them). */
+export type Quad = [number, number, number, number, number, number, number, number];
+
+/**
+ * Any Highlight annotation in the document (ours or another program's). id: its /NM, or
+ * "obj:<number>" when it has none. Quads: one per line, MuPDF page space.
+ */
+export type Highlight = {
+  id: string;
+  page: number;
+  quads: Quad[];
+  color: RGB;
+  /** /CA, 0–1 */
+  opacity: number;
+  objNum?: number;
+};
+
+export type HighlightInput = Omit<Highlight, "objNum">;
+
+export const newHighlightId = () => `${NM_PREFIX}hl-${crypto.randomUUID()}`;

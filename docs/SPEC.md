@@ -16,8 +16,8 @@
 - 여러 줄이면 주석 1개에 줄별 quad
 - 더블클릭은 단어 선택
 - 글자가 없는 곳이나 스캔본에서는 동작 안 함
-- 기존 하이라이트 클릭 → 팝오버(색 스와치, 삭제). Delete 키로도 삭제
-- 표시: 불투명 색 + Multiply blend (글자가 검정 그대로 보이도록)
+- 기존 하이라이트 클릭 → 팝오버(색 스와치, 불투명도, 삭제). Delete 키로도 삭제
+- 표시: 색 + Multiply blend (글자가 검정 그대로 보이도록). 불투명도는 슬라이더로 10~100%, 10% 단위, 기본 40%. 모양은 줄마다 평평한 직사각형. 기본 색은 청록 (Phase 4에서 결정)
 
 **공통**
 - 열기: 대화상자, drag&drop, 최근 파일, .pdf 연결 프로그램 등록
@@ -109,10 +109,11 @@ overlay 일치:
 - `font-kerning: none`, AP와 같은 line-height 사용
 
 ## Highlight 객체
-- MuPDF annot API를 써도 됨: createAnnotation("Highlight") → setQuadPoints → setColor → update()
-- quad는 `StructuredText.highlight(p, q)` 결과를 그대로 사용 (UL, UR, LL, LR 순서)
-- AP의 blend mode가 Multiply가 아니면 AP를 직접 생성
-- 기본 노랑은 Acrobat이 만든 하이라이트의 /C 값과 똑같이 맞춤
+- annot dict와 AP를 raw 객체로 직접 씀 (Phase 4에서 결정. 평평한 직사각형 AP를 쓰기로 해서 MuPDF annot API의 AP 생성은 쓰지 않음)
+- quad는 `StructuredText.highlight(p, q)` 결과를 그대로 사용 (UL, UR, LL, LR 순서). 더블클릭 단어는 `StructuredText.snap(p, p, "words")`
+- AP: quad를 채운 transparency group을 ExtGState `/BM /Multiply`, `/CA`·`/ca` = 불투명도로 합성. 줄끼리 겹쳐도 한 번만 칠해짐. annot에도 `/C`, `/CA`를 씀
+- 다른 프로그램이 만든 하이라이트도 import. 색이나 불투명도를 바꾸면 이 AP로 다시 씀
+- 스와치의 노랑은 Acrobat이 만든 하이라이트의 /C 값과 같음. 기본 색은 청록 `[0.219604 0.898041 1]`
 
 ## 텍스트 입력 주의
 - 한글 IME: keydown에서 `e.isComposing || e.keyCode === 229`이면 단축키, Enter, Esc 처리를 하지 말 것 (마지막 글자가 중복 입력되는 버그)
@@ -133,8 +134,9 @@ type TextBox = {
   id: string; page: number; x: number; y: number; text: string;
   size: number; weight: 'regular' | 'semibold'; color: RGB; objNum?: number;
 };
+type Quad = [number, number, number, number, number, number, number, number]; // UL, UR, LL, LR
 type Highlight = {
-  id: string; page: number; quads: Quad[]; color: RGB; objNum?: number;
+  id: string; page: number; quads: Quad[]; color: RGB; opacity: number; objNum?: number;
 };
 ```
 

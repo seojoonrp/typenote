@@ -8,7 +8,8 @@ import { PdfEditor } from "./engine/editor";
 import { makeFaces, type FontKit } from "./engine/fonts";
 import { NM_PREFIX } from "./engine/model";
 import { createSubsetter } from "./engine/subset";
-import type { ErrorCode, HiddenAnnots, OpenResult, PageSize, PutTextBoxResult, RenderParams, RenderResult, Request, Response, SaveResult } from "./protocol";
+import type { Quad } from "./engine/model";
+import type { ErrorCode, HiddenAnnots, OpenResult, PutHighlightResult, SelectTextParams, SelectTextResult, PageSize, PutTextBoxResult, RenderParams, RenderResult, Request, Response, SaveResult } from "./protocol";
 
 const PAGE_CACHE = 8;
 
@@ -58,8 +59,40 @@ function dropPages(indexes?: number[]) {
   }
 }
 
+// page text (annotations excluded) for highlight selection, kept until the document is reopened
+type PageText = { st: mupdf.StructuredText; lines: mupdf.Rect[] };
+const texts = new Map<number, PageText>();
+
+function pageText(index: number): PageText {
+  let t = texts.get(index);
+  if (!t) {
+    const st = getPage(index).toStructuredText("preserve-whitespace");
+    const lines: mupdf.Rect[] = [];
+    st.walk({ beginLine: (bbox) => void lines.push(bbox) });
+    texts.set(index, (t = { st, lines }));
+  }
+  return t;
+}
+
+/** pt of slack around a text line in which a press still counts as "on the text" */
+const LINE_SLOP = 1;
+
+function selectText({ page, from, to, mode }: SelectTextParams): SelectTextResult {
+  const { st, lines } = pageText(page);
+  const [x, y] = from;
+  const onText = lines.some((b) => x >= b[0] - LINE_SLOP && x <= b[2] + LINE_SLOP && y >= b[1] - LINE_SLOP && y <= b[3] + LINE_SLOP);
+  if (!onText) return [];
+  if (mode === "word") {
+    const q = st.snap(from, from, "words") as Quad;
+    return q[2] - q[0] > 0.1 || q[3] - q[1] > 0.1 ? [q] : [];
+  }
+  return st.highlight(from, to, 1000) as Quad[];
+}
+
 function closeDoc() {
   dropPages();
+  for (const t of texts.values()) t.st.destroy();
+  texts.clear();
   editor?.doc.destroy();
   editor = null;
 }
@@ -106,7 +139,7 @@ function open(bytes: ArrayBuffer): OpenResult {
     sizes.push({ width: x1 - x0, height: y1 - y0 });
   }
   void loadKit().catch(() => {}); // warm up so the first edit is quick
-  return { docId, pageCount: count, pages: sizes, textBoxes: editor.textBoxes() };
+  return { docId, pageCount: count, pages: sizes, textBoxes: editor.textBoxes(), highlights: editor.highlights() };
 }
 
 /** Saves, then continues from the saved bytes so the next incremental save appends to them. */
@@ -115,7 +148,7 @@ async function save(full: boolean): Promise<SaveResult> {
   const next = new PdfEditor(new mupdf.PDFDocument(bytes), loadKit);
   closeDoc();
   editor = next;
-  return { bytes, mode, textBoxes: next.textBoxes() };
+  return { bytes, mode, textBoxes: next.textBoxes(), highlights: next.highlights() };
 }
 
 function isHidden(annot: mupdf.PDFAnnotation, hide: HiddenAnnots): boolean {
@@ -223,6 +256,23 @@ export async function handle(msg: Request, reply: Reply) {
         const page = current().deleteTextBox(msg.boxId);
         if (page !== null) dropPages([page]);
         reply({ id: msg.id, ok: true, result: page });
+        break;
+      }
+      case "putHighlight": {
+        const result: PutHighlightResult = current().putHighlight(msg.highlight);
+        dropPages(result.pages);
+        reply({ id: msg.id, ok: true, result });
+        break;
+      }
+      case "deleteHighlight": {
+        const page = current().deleteHighlight(msg.highlightId);
+        if (page !== null) dropPages([page]);
+        reply({ id: msg.id, ok: true, result: page });
+        break;
+      }
+      case "selectText": {
+        const { id, kind: _kind, ...params } = msg;
+        reply({ id, ok: true, result: selectText(params) });
         break;
       }
       case "save": {

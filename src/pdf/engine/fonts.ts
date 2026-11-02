@@ -124,7 +124,7 @@ export function rewriteFontObjects(kit: FontKit, type0: mupdf.PDFObject, face: F
   const cps = [...codepoints];
   if (type0.get("BaseFont").asName() === baseFontName(face, cps)) return false;
   const p = payload(kit, face, cps);
-  const cidFont = type0.get("DescendantFonts").get(0);
+  const cidFont = type0.get("DescendantFonts", 0);
   const descriptor = cidFont.get("FontDescriptor");
   const fontFile = descriptor.get("FontFile2");
   fontFile.writeStream(p.subset);

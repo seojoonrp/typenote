@@ -10,9 +10,8 @@ import { keyNav, LINE, WheelPager, type Nav } from "./navigation";
 import { RenderCache, type Want } from "./renderCache";
 import { clampZoom, renderScale, stepZoom } from "./zoom";
 
-// App text boxes are drawn by the HTML overlay; highlights stay in the base bitmap until the
-// highlight overlay exists (Phase 4).
-const HIDDEN: HiddenAnnots = { textBoxes: true, highlights: false };
+// App text boxes and all highlights are drawn by the HTML overlay, not the base bitmap.
+const HIDDEN: HiddenAnnots = { textBoxes: true, highlights: true };
 /** pages rendered besides the current one, so flipping shows them at once */
 const PREFETCH = [1, 2, -1];
 const GESTURE_SETTLE_MS = 180;

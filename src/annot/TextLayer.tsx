@@ -12,10 +12,16 @@ import { KEEP_DRAFT_ATTR, type Draft, type TextTool } from "./useTextTool";
 const DRAG_THRESHOLD_PX = 3;
 const BAR_HEIGHT_PX = 34;
 
-type Props = { view: PageView; tt: TextTool; faces: Faces };
+type Props = {
+  view: PageView;
+  tt: TextTool;
+  faces: Faces;
+  /** select tool, click on no box: lets a highlight under the point take it (true = taken) */
+  onBackgroundClick?: (pt: { x: number; y: number }) => boolean;
+};
 type Drag = { id: string; dx: number; dy: number };
 
-export function TextLayer({ view, tt, faces }: Props) {
+export function TextLayer({ view, tt, faces, onBackgroundClick }: Props) {
   const { page, scale } = view;
   const layerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -34,7 +40,10 @@ export function TextLayer({ view, tt, faces }: Props) {
   const onLayerDown = (e: ReactPointerEvent) => {
     if (e.button !== 0) return;
     if (tt.tool === "text") tt.beginNew(page, toPage(e.clientX, e.clientY));
-    else tt.select(null);
+    else {
+      tt.select(null);
+      onBackgroundClick?.(toPage(e.clientX, e.clientY));
+    }
   };
 
   const onBoxDown = (box: TextBox) => (e: ReactPointerEvent<HTMLDivElement>) => {

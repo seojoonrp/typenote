@@ -1,6 +1,18 @@
 // Main-thread handle to the MuPDF worker.
-import type { TextBoxInput } from "./engine/model";
-import type { ErrorCode, OpenResult, PutTextBoxResult, RenderParams, RenderResult, Request, Response, SaveResult } from "./protocol";
+import type { HighlightInput, TextBoxInput } from "./engine/model";
+import type {
+  ErrorCode,
+  OpenResult,
+  PutHighlightResult,
+  PutTextBoxResult,
+  RenderParams,
+  RenderResult,
+  Request,
+  Response,
+  SaveResult,
+  SelectTextParams,
+  SelectTextResult,
+} from "./protocol";
 
 export class PdfError extends Error {
   constructor(
@@ -62,6 +74,20 @@ export class PdfClient {
   /** Resolves to the page the box was on, or null if it did not exist. */
   deleteTextBox(boxId: string): Promise<number | null> {
     return this.send<number | null>({ kind: "deleteTextBox", boxId }).promise;
+  }
+
+  putHighlight(highlight: HighlightInput): Promise<PutHighlightResult> {
+    return this.send<PutHighlightResult>({ kind: "putHighlight", highlight }).promise;
+  }
+
+  /** Resolves to the page the highlight was on, or null if it did not exist. */
+  deleteHighlight(highlightId: string): Promise<number | null> {
+    return this.send<number | null>({ kind: "deleteHighlight", highlightId }).promise;
+  }
+
+  /** Line quads of the page text selected between two points (or the word at `from`). */
+  selectText(params: SelectTextParams): Promise<SelectTextResult> {
+    return this.send<SelectTextResult>({ kind: "selectText", ...params }).promise;
   }
 
   /** The bytes to write to disk; the worker continues from them for the next save. */

@@ -1,22 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TextBox, TextBoxInput } from "../pdf/engine/model";
+import type { Highlight, HighlightInput, TextBox, TextBoxInput } from "../pdf/engine/model";
 import { SaveError, type FileStamp } from "../platform/types";
 import { AUTOSAVE_DELAY_MS, DocStore, LOCKED_RETRY_MS } from "./DocStore";
 
 const BOX: TextBoxInput = { page: 0, x: 10, y: 10, text: "가", size: 12, weight: "regular", color: [0, 0, 0] };
+const HL: HighlightInput = { id: "typenote-hl-1", page: 0, quads: [[10, 10, 90, 10, 10, 22, 90, 22]], color: [0.219604, 0.898041, 1], opacity: 0.4 };
 
 function setup() {
   let n = 0;
   const boxes = new Map<string, TextBox>();
+  const highlights = new Map<string, Highlight>();
   const client = {
-    open: vi.fn(async () => ({ docId: 1, pageCount: 1, pages: [{ width: 595, height: 842 }], textBoxes: [] })),
+    open: vi.fn(async () => ({ docId: 1, pageCount: 1, pages: [{ width: 595, height: 842 }], textBoxes: [], highlights: [] })),
     putTextBox: vi.fn(async (b: TextBoxInput) => {
       const box = { ...b, id: b.id ?? `typenote-${++n}`, objNum: 100 + n };
       boxes.set(box.id, box);
       return { box, missing: [], pages: [box.page] };
     }),
     deleteTextBox: vi.fn(async (id: string) => (boxes.delete(id) ? 0 : null)),
-    save: vi.fn(async (_full: boolean) => ({ bytes: new Uint8Array([1, 2, 3]), mode: "incremental" as const, textBoxes: [...boxes.values()] })),
+    putHighlight: vi.fn(async (h: HighlightInput) => {
+      const highlight = { ...h, objNum: highlights.get(h.id)?.objNum ?? 500 + ++n };
+      highlights.set(h.id, highlight);
+      return { highlight, pages: [h.page] };
+    }),
+    deleteHighlight: vi.fn(async (id: string) => (highlights.delete(id) ? 0 : null)),
+    save: vi.fn(async (_full: boolean) => ({
+      bytes: new Uint8Array([1, 2, 3]),
+      mode: "incremental" as const,
+      textBoxes: [...boxes.values()],
+      highlights: [...highlights.values()],
+    })),
   };
   let stamp: FileStamp = { size: 1, modified: 1 };
   const writes: { path: string; expected: FileStamp | null }[] = [];
@@ -79,7 +92,7 @@ describe("DocStore", () => {
     let release!: () => void;
     client.save.mockImplementationOnce(async () => {
       await new Promise<void>((r) => (release = r));
-      return { bytes: new Uint8Array(), mode: "incremental", textBoxes: [box] };
+      return { bytes: new Uint8Array(), mode: "incremental", textBoxes: [box], highlights: [] };
     });
     const first = store.save();
     await vi.advanceTimersByTimeAsync(0);
@@ -208,5 +221,46 @@ describe("DocStore", () => {
     expect(store.getState().editError).toBe("boom");
     await store.undo(); // the rejected edit left no undo step: this undoes the create
     expect(store.getState().textBoxes).toEqual([]);
+  });
+
+  it("highlights share the undo history with text boxes", async () => {
+    const { store, client, open } = setup();
+    await open();
+    const { box } = (await store.putTextBox(BOX))!;
+    await store.putHighlight(HL);
+    expect(store.getState().highlights).toMatchObject([{ id: HL.id, objNum: expect.any(Number) }]);
+    await store.putHighlight({ ...HL, color: [1, 0.819611, 0] });
+    await store.deleteHighlight(HL.id);
+    expect(store.getState().highlights).toEqual([]);
+
+    await store.undo(); // delete
+    expect(store.getState().highlights).toMatchObject([{ id: HL.id, color: [1, 0.819611, 0] }]);
+    await store.undo(); // color
+    expect(store.getState().highlights).toMatchObject([{ color: HL.color }]);
+    await store.undo(); // create
+    expect(store.getState().highlights).toEqual([]);
+    expect(client.deleteHighlight).toHaveBeenLastCalledWith(HL.id);
+    await store.undo(); // the text box
+    expect(store.getState().textBoxes).toEqual([]);
+    expect(store.getState().canUndo).toBe(false);
+
+    await store.redo();
+    await store.redo();
+    expect(store.getState().textBoxes).toMatchObject([{ id: box.id }]);
+    expect(store.getState().highlights).toMatchObject([{ id: HL.id, color: HL.color }]);
+  });
+
+  it("dragging the opacity slider is one undo step", async () => {
+    const { store, writes, open } = setup();
+    await open();
+    await store.putHighlight(HL);
+    for (const opacity of [0.5, 0.6, 0.7, 0.8]) {
+      await store.putHighlight({ ...HL, opacity }, { merge: `opacity:${HL.id}` });
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    await store.undo();
+    expect(store.getState().highlights[0]!.opacity).toBe(0.4);
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS);
+    expect(writes).toHaveLength(1);
   });
 });

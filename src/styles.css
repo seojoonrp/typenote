@@ -398,3 +398,50 @@ button.primary {
   margin: 0 2px;
   background: var(--border);
 }
+
+/* --- highlight overlay -------------------------------------------------------------- */
+
+.hl-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hl-layer.tool-highlight {
+  pointer-events: auto;
+  cursor: text;
+  user-select: none;
+}
+
+.hl-shape {
+  position: absolute;
+  overflow: visible;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.hl-selected {
+  position: absolute;
+  outline: 1.5px dashed var(--accent);
+  pointer-events: none;
+}
+
+.hl-layer .attr-bar {
+  pointer-events: auto;
+}
+
+/* the text layer stays out of the way of the highlight tool */
+.text-layer.tool-highlight,
+.text-layer.tool-highlight .tbox {
+  pointer-events: none;
+}
+
+.attr-bar .opacity {
+  width: 90px;
+}
+
+.attr-bar .opacity-label {
+  min-width: 34px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

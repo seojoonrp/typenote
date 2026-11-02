@@ -1,11 +1,14 @@
-// Edits app text boxes in an open document and saves it. Used by the worker session and tests.
+// Edits app text boxes and highlights in an open document and saves it. Used by the worker
+// session and tests.
 import * as mupdf from "mupdf";
 import { createFontObjects, rewriteFontObjects, type FontKit } from "./fonts";
 import { findSharedFonts, locateFreeText, readTextBoxes, removeFreeText, usedCodepoints, writeFreeText } from "./freetext";
-import { newBoxId, type TextBox, type TextBoxInput, type Weight } from "./model";
+import { locateHighlight, readHighlights, removeHighlight, writeHighlight } from "./highlight";
+import { newBoxId, type Highlight, type HighlightInput, type TextBox, type TextBoxInput, type Weight } from "./model";
 
 export type SaveMode = "incremental" | "full";
 export type PutResult = { box: TextBox; missing: string[]; pages: number[] };
+export type PutHighlightResult = { highlight: Highlight; pages: number[] };
 
 export class PdfEditor {
   /** Type0 font per weight, shared by every box of that weight (kept even when unused). */
@@ -22,6 +25,33 @@ export class PdfEditor {
 
   textBoxes(): TextBox[] {
     return readTextBoxes(this.doc);
+  }
+
+  highlights(): Highlight[] {
+    return readHighlights(this.doc);
+  }
+
+  /** Creates or updates (color, opacity, quads) a highlight, keeping its annotation object. */
+  putHighlight(h: HighlightInput): PutHighlightResult {
+    if (h.page < 0 || h.page >= this.doc.countPages()) throw new Error(`no page ${h.page}`);
+    if (h.quads.length === 0) throw new Error("a highlight needs at least one quad");
+    const pages = [h.page];
+    let existing = locateHighlight(this.doc, h.id);
+    if (existing && existing.page !== h.page) {
+      removeHighlight(this.doc, existing);
+      pages.push(existing.page);
+      existing = undefined;
+    }
+    const annot = writeHighlight(this.doc, h, existing?.annot);
+    return { highlight: { ...h, objNum: annot.asIndirect() }, pages };
+  }
+
+  /** Returns the page the highlight was on, or null if there is no such highlight. */
+  deleteHighlight(id: string): number | null {
+    const found = locateHighlight(this.doc, id);
+    if (!found) return null;
+    removeHighlight(this.doc, found);
+    return found.page;
   }
 
   /** Creates or updates a box. Moving it to another page recreates it there under the same id. */

@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 import { AttributeBar } from "./annot/AttributeBar";
 import { useFaces } from "./annot/fonts";
 import { TextLayer } from "./annot/TextLayer";
+import { HighlightBar } from "./annot/HighlightBar";
+import { HighlightLayer } from "./annot/HighlightLayer";
+import { highlightAt } from "./annot/highlightStyle";
+import { useHighlightTool } from "./annot/useHighlightTool";
 import { useTextTool } from "./annot/useTextTool";
 import { DocStore, type SaveOptions, type SaveProblem } from "./doc/DocStore";
 import { PdfClient, PdfError } from "./pdf/client";
@@ -116,6 +120,21 @@ export function App() {
 
   const faces = useFaces();
   const tt = useTextTool(store, faces, page);
+  const ht = useHighlightTool(store, page);
+
+  // one selection at a time: a text box or a highlight
+  const textSelected = tt.selected?.id;
+  const highlightSelected = ht.selected?.id;
+  const { select: selectHighlight } = ht;
+  useEffect(() => {
+    if (textSelected) selectHighlight(null);
+  }, [textSelected, selectHighlight]);
+  useEffect(() => {
+    if (highlightSelected) tt.select(null);
+  }, [highlightSelected]); // only when a highlight gets selected (tt.select is not memoized)
+  useEffect(() => {
+    if (tt.tool === "text") selectHighlight(null);
+  }, [tt.tool, selectHighlight]);
 
   // focus the pages so arrow keys / PageUp / PageDown work right away
   const docId = doc?.info.docId;
@@ -209,6 +228,9 @@ export function App() {
             <button className={tt.tool === "text" ? "active" : ""} onClick={() => tt.setTool("text")} title="텍스트 (T)">
               텍스트
             </button>
+            <button className={tt.tool === "highlight" ? "active" : ""} onClick={() => tt.setTool("highlight")} title="하이라이트 (H)">
+              하이라이트
+            </button>
             <span className="sep" />
             <button onClick={() => void store.undo()} disabled={!state.canUndo} title="실행 취소 (Ctrl+Z)">
               ↶
@@ -219,6 +241,7 @@ export function App() {
             {/* always present in the text tool, so selecting never reflows the toolbar (and the page);
                 it edits the selected box or, with nothing selected, the tool defaults */}
             {tt.tool === "text" && <AttributeBar className="docked" value={tt.target} onChange={tt.setStyle} onStepSize={tt.stepSizeBy} />}
+            {tt.tool === "highlight" && <HighlightBar className="docked" value={ht.target} onChange={ht.setStyle} />}
           </>
         )}
         <span className="title">{doc ? doc.name : ""}</span>
@@ -280,7 +303,23 @@ export function App() {
           initialZoom={zoom.value}
           onPageChange={setPage}
           onZoomChange={onZoomChange}
-          overlay={(view) => faces && <TextLayer view={view} tt={tt} faces={faces} />}
+          overlay={(view) =>
+            faces && (
+              <>
+                <HighlightLayer view={view} ht={ht} tool={tt.tool} client={client} />
+                <TextLayer
+                  view={view}
+                  tt={tt}
+                  faces={faces}
+                  onBackgroundClick={(pt) => {
+                    const hit = highlightAt(ht.highlights.filter((h) => h.page === view.page), pt.x, pt.y);
+                    ht.select(hit?.id ?? null);
+                    return !!hit;
+                  }}
+                />
+              </>
+            )
+          }
         />
       ) : (
         <main className="start">
