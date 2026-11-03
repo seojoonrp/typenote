@@ -10,7 +10,7 @@ const dir = path.resolve(process.argv[2] ?? "");
 if (!process.argv[2]) throw new Error("usage: node tools/tab-test.mjs <work dir>");
 const root = path.resolve(import.meta.dirname, "..");
 const exe = path.join(root, "src-tauri", "target", "debug", "typenote.exe");
-for (const n of ["a", "b", "c", "d"]) fs.copyFileSync(path.join(root, "spike", "out", "test.pdf"), path.join(dir, `${n}.pdf`));
+for (const n of ["a", "b", "c", "d", "n10", "N2", "n1"]) fs.copyFileSync(path.join(root, "spike", "out", "test.pdf"), path.join(dir, `${n}.pdf`));
 const env = { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9222" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -129,6 +129,49 @@ try {
   console.log("launch d.pdf by a relative path:", await launch(["d.pdf"], dir));
   await sleep(1500);
   await show("12 relative path resolved against the caller's folder");
+
+  await evaluate(`__typenote.openPaths(${JSON.stringify(["n10.pdf", "N2.pdf", "n1.pdf"].map((n) => path.join(dir, n)))})`);
+  await sleep(3000);
+  await show("13 three at once -> n1, N2, n10 (name order), n10 shown");
+
+  // drag the first tab past the third: it follows the pointer and lands third
+  const tabAt = (i) => `(() => { const r = document.querySelectorAll('.tabbar .tab')[${i}].getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2, r.width]; })()`;
+  const [fx, fy] = await evaluate(tabAt(0));
+  const [tx] = await evaluate(tabAt(2));
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: fx, y: fy });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: fx, y: fy, button: "left", buttons: 1, clickCount: 1 });
+  for (let k = 1; k <= 10; k++) {
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: fx + ((tx + 10 - fx) * k) / 10, y: fy, button: "left", buttons: 1 });
+    await sleep(30);
+  }
+  console.log("   dragging:", await evaluate(`document.querySelector('.tab.dragging')?.textContent ?? null`));
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: tx + 10, y: fy, button: "left", buttons: 0, clickCount: 1 });
+  await sleep(500);
+  await show("14 first tab (b) dragged to third place, shown");
+  const left = await evaluate(`[...document.querySelectorAll('.tabbar .tab')].map((t) => t.style.transform || '-').join(' ')`);
+  console.log("   transforms after drop:", left);
+
+  // I-beam only over text lines (select tool, then highlight tool)
+  await sleep(1000);
+  const cursorScan = async (layer) => {
+    const lines = await evaluate(`__typenote.tabs.active.client.textLines(__typenote.tabs.active.view.page)`);
+    const sz = await evaluate(`__typenote.store.getState().doc.info.pages[__typenote.tabs.active.view.page]`);
+    const r = await evaluate(`(() => { const r = document.querySelector('${layer}').getBoundingClientRect(); return [r.left, r.top, r.width]; })()`);
+    const k = r[2] / sz.width;
+    const [x0, y0, x1, y1] = lines[0];
+    const on = [r[0] + ((x0 + x1) / 2) * k, r[1] + ((y0 + y1) / 2) * k];
+    const off = [r[0] + 5 * k, r[1] + (sz.height - 5) * k];
+    const read = async ([x, y]) => {
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+      await sleep(50);
+      return evaluate(`getComputedStyle(document.querySelector('${layer}')).cursor + ' ' + document.elementFromPoint(${x}, ${y})?.className`);
+    };
+    return { lines: lines.length, onText: await read(on), offText: await read(off) };
+  };
+  await key("v", "KeyV", 86); // the tool is remembered between runs
+  console.log("15 select tool cursor:   ", JSON.stringify(await cursorScan(".text-layer")));
+  await key("h", "KeyH", 72);
+  console.log("16 highlight tool cursor:", JSON.stringify(await cursorScan(".hl-layer")));
 } finally {
   ws?.close();
   // only what this script started (never an installed copy the user is running)

@@ -3,6 +3,9 @@ export type FileStamp = { size: number; modified: number };
 
 export type OpenedFile = { name: string; path: string | null; bytes: Uint8Array; stamp: FileStamp | null };
 
+/** A file the user chose (dialog, drop), not read yet. */
+export type ChosenFile = { name: string; path: string | null; load(): Promise<OpenedFile> };
+
 export type SaveErrorKind = "locked" | "conflict" | "readonly" | "io";
 export class SaveError extends Error {
   constructor(
@@ -15,7 +18,8 @@ export class SaveError extends Error {
 
 /** What the UI needs from the host. Tauri in the app; a browser fallback for development. */
 export interface Platform {
-  pickPdf(): Promise<OpenedFile | null>;
+  /** The open dialog; several files can be chosen. */
+  pickPdfs(): Promise<ChosenFile[]>;
   readPath(path: string): Promise<OpenedFile>;
   /**
    * Replaces the file with `bytes` (temp file + rename). With `expected`, refuses with a
@@ -36,7 +40,7 @@ export interface Platform {
   addRecentFile(path: string): Promise<string[]>;
   removeRecentFile(path: string): Promise<string[]>;
   /** Subscribes to PDFs dropped on the window; returns an unsubscribe function. */
-  onFileDrop(cb: (load: () => Promise<OpenedFile>, path: string | null) => void): () => void;
+  onFileDrop(cb: (files: ChosenFile[]) => void): () => void;
   setTitle(title: string): void;
 }
 

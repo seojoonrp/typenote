@@ -22,10 +22,12 @@ type Props = {
   onBackgroundPress?: (e: ReactPointerEvent<HTMLDivElement>, pt: { x: number; y: number }, toPage: (clientX: number, clientY: number) => { x: number; y: number }) => void;
   /** select tool, double-click on no box (selects the word under it) */
   onBackgroundDoubleClick?: (pt: { x: number; y: number }) => void;
+  /** is there page text at this point (the select tool shows an I-beam there) */
+  overText?: (x: number, y: number) => boolean;
 };
 type Drag = { id: string; dx: number; dy: number };
 
-export function TextLayer({ view, tt, faces, onBackgroundPress, onBackgroundDoubleClick }: Props) {
+export function TextLayer({ view, tt, faces, onBackgroundPress, onBackgroundDoubleClick, overText }: Props) {
   const { page, scale } = view;
   const layerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -106,6 +108,11 @@ export function TextLayer({ view, tt, faces, onBackgroundPress, onBackgroundDoub
       ref={layerRef}
       className={`text-layer tool-${tt.tool}`}
       onPointerDown={onLayerDown}
+      onPointerMove={(e) => {
+        if (tt.tool !== "select" || e.buttons) return;
+        const p = toPage(e.clientX, e.clientY);
+        e.currentTarget.style.cursor = overText?.(p.x, p.y) ? "text" : "";
+      }}
       onDoubleClick={(e) => tt.tool === "select" && onBackgroundDoubleClick?.(toPage(e.clientX, e.clientY))}
       // no focus change or text selection from clicks on the page (the editor places its caret itself)
       onMouseDown={(e) => !(e.target instanceof HTMLTextAreaElement) && e.preventDefault()}

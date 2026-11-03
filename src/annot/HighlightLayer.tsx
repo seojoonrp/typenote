@@ -15,12 +15,19 @@ const BAR_HEIGHT_PX = 40;
 /** room between a floating bar and what it belongs to */
 const BAR_GAP_PX = 10;
 
-type Props = { view: PageView; ht: HighlightTool; tool: Tool; client: PdfClient };
+type Props = {
+  view: PageView;
+  ht: HighlightTool;
+  tool: Tool;
+  client: PdfClient;
+  /** is there page text at this point (an I-beam there, the normal pointer elsewhere) */
+  overText: (x: number, y: number) => boolean;
+};
 type Pt = [number, number];
 /** a drag in progress: selection requests are sent one at a time, the latest point wins */
 type Selecting = { start: Pt; latest: Pt | null; busy: boolean };
 
-export function HighlightLayer({ view, ht, tool, client }: Props) {
+export function HighlightLayer({ view, ht, tool, client, overText }: Props) {
   const { page, scale } = view;
   const layerRef = useRef<HTMLDivElement>(null);
   const selecting = useRef<Selecting | null>(null);
@@ -118,6 +125,11 @@ export function HighlightLayer({ view, ht, tool, client }: Props) {
       ref={layerRef}
       className={`hl-layer tool-${tool}`}
       onPointerDown={onPointerDown}
+      onPointerMove={(e) => {
+        if (tool !== "highlight" || e.buttons) return;
+        const [x, y] = toPage(e.clientX, e.clientY);
+        e.currentTarget.style.cursor = overText(x, y) ? "text" : "";
+      }}
       onDoubleClick={onDoubleClick}
       // no focus change or native text selection while dragging over the page
       onMouseDown={(e) => tool === "highlight" && e.preventDefault()}

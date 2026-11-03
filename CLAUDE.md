@@ -68,8 +68,8 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - 실제 앱 시나리오는 `tools/highlight-test.mjs`, overlay와 AP 비교는 `tools/highlight-compare.mjs`로 돌린다.
 
 ## 탭, 호환성, 배포 (Phase 5와 이후 피드백)
-- **창은 하나, 문서마다 탭 하나.** `tauri-plugin-single-instance`(반드시 첫 번째 플러그인)가 두 번째 실행의 명령줄을 첫 프로세스로 넘기면 `src-tauri/src/launch.rs`가 열 파일을 쌓아 두고 main 창에 `open-request` 신호를 보낸다. 프런트는 `launch_paths`로 한 번에 가져가서 순서대로 연다(동시에 열면 탭 순서가 섞인다).
-- 탭은 `src/doc/Tabs.ts`. **탭마다 자기 `PdfClient`(worker)와 `DocStore`**를 가진다. 탭을 닫으면 worker를 terminate해서 WASM 메모리를 돌려받는다. 같은 파일 판별은 `pathKey`(소문자, 역슬래시). 탭은 문서가 열린 뒤에만 목록에 들어간다.
+- **창은 하나, 문서마다 탭 하나.** `tauri-plugin-single-instance`(반드시 첫 번째 플러그인)가 두 번째 실행의 명령줄을 첫 프로세스로 넘기면 `src-tauri/src/launch.rs`가 열 파일을 쌓아 두고 main 창에 `open-request` 신호를 보낸다. 프런트는 `launch_paths`로 한 번에 가져가서 순서대로 연다(동시에 열면 탭 순서가 섞인다). 대화상자와 끌어 놓기로 고른 여러 파일(`ChosenFile`)은 파일 이름 자연 정렬 후 같은 큐(`App.tsx`의 `enqueue`)로 연다.
+- 탭은 `src/doc/Tabs.ts`. **탭마다 자기 `PdfClient`(worker)와 `DocStore`**를 가진다. 탭을 끌어서 순서를 바꾸는 `TabBar`는 pointermove/up을 **window에서** 받는다(순서가 바뀌면 React가 노드를 옮겨 pointer capture가 풀린다). 탭을 닫으면 worker를 terminate해서 WASM 메모리를 돌려받는다. 같은 파일 판별은 `pathKey`(소문자, 역슬래시). 탭은 문서가 열린 뒤에만 목록에 들어간다.
 - `src/App.tsx`는 탭, 열기, 닫기, 창 단축키(Ctrl+O/W/Tab/PageUp/PageDown)만 맡고, 보이는 탭의 화면은 `src/DocumentView.tsx`(key = 탭 id)가 그린다. 탭을 바꾸면 DocumentView가 다시 마운트되므로 탭의 쪽과 배율은 `tab.view`에, 입력 중인 글자는 `tab.flush`(= `tt.commit`)로 넘기기 전에 확정한다. 창 제목은 DocumentView가 정한다(탭의 DocStore host의 `setTitle`은 아무것도 안 함).
 - **dev 빌드는 identifier에 `.dev`를 붙인다**(`main.rs`). 설치된 앱과 single-instance 잠금, settings.json(최근 파일), WebView2 데이터를 공유하지 않게 하기 위해서다. 테스트 도구는 자기가 띄운 프로세스만 종료한다(`taskkill /IM` 금지: 사용자가 쓰는 앱까지 죽는다). release 빌드는 설치된 앱과 identifier가 같으므로, 사용자가 앱을 쓰는 중에는 release exe를 실행하지 않는다.
 - 호환성: `src/pdf/engine/corpus.ts`(파일 구조 변형과 앱의 편집 왕복)를 `compat.test.ts`(단위 테스트)와 `tools/compat-render.ts`(MuPDF, poppler, PDFium, pdf.js 렌더 비교)가 함께 쓴다. MuPDF는 linearize 저장을 더 이상 지원하지 않는다.
@@ -83,6 +83,7 @@ Acrobat에서 한글 FreeText가 깨지는 문제를 피하기 위한, 텍스트
 - **휠로 쪽 넘기기**(`navigation.ts`의 `WheelPager`): 쪽 끝에서 마우스 휠은 한 칸에 한 쪽(빠르게 굴려도 칸마다), 터치패드는 `SMOOTH_PAGE_PX`마다 한 쪽. 마우스 휠인지는 옛 `wheelDeltaY`가 120의 배수인지로 판단한다(`deltaY` 크기로는 빠른 터치패드와 구별되지 않음). 터치패드 관성이 긴 쪽의 끝에 닿아도 넘기지 않도록, 터치패드는 쪽 끝에서 시작한 burst만 넘긴다. 아직 그려지지 않은 연속 넘김은 `pageAhead`(300ms)로 이어 센다. 쪽 끝 판정 여유는 `EDGE_EPS` 1.5px다(배율에 따라 scrollTop이 58.3/59처럼 소수 픽셀에서 멈춰서 0.5px이면 쪽이 넘어가지 않았음). 스크립트로 보낸 wheel 이벤트는 네이티브 스크롤을 하지 않으므로, 쪽 안 스크롤까지 확인할 때는 CDP `Input.dispatchMouseEvent` mouseWheel(신뢰 이벤트, wheelDeltaY −120)을 쓴다.
 - **문서 스크롤바**: `src/viewer/DocScrollbar.tsx`. 네이티브 세로 스크롤바는 숨긴다(`::-webkit-scrollbar` width 0, 가로는 그대로). 휠은 `.viewer`에서 받아서 스크롤바 위에서도 쪽을 넘긴다.
 - 쪽 위에 뜨는 막대들은 `useKeepInside`(`src/annot/floating.ts`)로 쪽 안에 들어오게 밀고, `.content`는 `overflow: clip`이라 무엇이 삐져나와도 가로 스크롤이 생기지 않는다.
+- 선택·하이라이트 도구의 I자 커서는 worker `textLines`(글자 줄 bbox) + `useTextLines`로 pointermove에서 정한다. CSS에 고정 `cursor: text`를 두지 않는다.
 - 텍스트 상자: 윤곽선(`.tbox-edge`)은 텍스트 도구에서도 이동 손잡이이고, 상자 안을 클릭하면 `caretIndexAt`로 클릭한 위치에 커서를 놓는다. 편집 중인 textarea에서는 layer의 mousedown preventDefault를 하지 않는다(그래야 클릭으로 커서가 옮겨진다).
 
 ## 디자인

@@ -296,6 +296,10 @@ export async function handle(msg: Request, reply: Reply) {
         reply({ id, ok: true, result: selectText(params) });
         break;
       }
+      case "textLines": {
+        reply({ id: msg.id, ok: true, result: pageText(msg.page).lines });
+        break;
+      }
       case "copyText": {
         const { id, kind: _kind, ...params } = msg;
         reply({ id, ok: true, result: copyText(params) });

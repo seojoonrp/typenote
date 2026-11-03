@@ -3,13 +3,15 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
-import { baseName, isPdfName, SaveError, type FileStamp, type OpenedFile, type Platform, type SaveErrorKind } from "./types";
+import { baseName, isPdfName, SaveError, type ChosenFile, type FileStamp, type OpenedFile, type Platform, type SaveErrorKind } from "./types";
 
 async function readPath(path: string): Promise<OpenedFile> {
   const stamp = await invoke<FileStamp>("file_stamp", { path });
   const buffer = await invoke<ArrayBuffer>("read_pdf", { path });
   return { name: baseName(path), path, bytes: new Uint8Array(buffer), stamp };
 }
+
+const chosen = (path: string): ChosenFile => ({ name: baseName(path), path, load: () => readPath(path) });
 
 /** Subscribes to a Tauri event source whose unlisten function arrives asynchronously. */
 function subscribe(start: () => Promise<() => void>): () => void {
@@ -26,9 +28,9 @@ function subscribe(start: () => Promise<() => void>): () => void {
 }
 
 export const tauriPlatform: Platform = {
-  async pickPdf() {
-    const path = await open({ multiple: false, directory: false, filters: [{ name: "PDF", extensions: ["pdf"] }] });
-    return path ? readPath(path) : null;
+  async pickPdfs() {
+    const paths = await open({ multiple: true, directory: false, filters: [{ name: "PDF", extensions: ["pdf"] }] });
+    return (paths ?? []).map(chosen);
   },
   readPath,
   async writePdf(path, bytes, expected) {
@@ -76,8 +78,8 @@ export const tauriPlatform: Platform = {
     return subscribe(() =>
       getCurrentWebview().onDragDropEvent((ev) => {
         if (ev.payload.type !== "drop") return;
-        const path = ev.payload.paths.find(isPdfName);
-        if (path) cb(() => readPath(path), path);
+        const files = ev.payload.paths.filter(isPdfName).map(chosen);
+        if (files.length) cb(files);
       }),
     );
   },

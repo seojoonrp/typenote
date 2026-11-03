@@ -70,6 +70,16 @@ export class Tabs {
     this.set({ activeId: id });
   }
 
+  /** Moves a tab to position `index` (dragging tabs). */
+  move(id: number, index: number) {
+    const tabs = [...this.state.tabs];
+    const from = tabs.findIndex((t) => t.id === id);
+    if (from < 0) return;
+    const [tab] = tabs.splice(from, 1);
+    tabs.splice(Math.max(0, Math.min(tabs.length, index)), 0, tab!);
+    if (tabs.some((t, i) => t !== this.state.tabs[i])) this.set({ tabs });
+  }
+
   /** Shows the next (1) or previous (-1) tab, wrapping around. */
   cycle(dir: 1 | -1) {
     const { tabs } = this.state;

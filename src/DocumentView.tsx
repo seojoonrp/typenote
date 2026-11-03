@@ -10,6 +10,7 @@ import { SelectionLayer } from "./annot/SelectionLayer";
 import { highlightAt } from "./annot/highlightStyle";
 import { TextLayer } from "./annot/TextLayer";
 import { useHighlightTool } from "./annot/useHighlightTool";
+import { useTextLines } from "./annot/useTextLines";
 import { useTextSelection } from "./annot/useTextSelection";
 import { useTextTool } from "./annot/useTextTool";
 import type { SaveOptions, SaveProblem } from "./doc/DocStore";
@@ -73,6 +74,7 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
   const tt = useTextTool(store, faces, page);
   const ht = useHighlightTool(store, page);
   const ts = useTextSelection(client, page);
+  const overText = useTextLines(client, page);
 
   // switching or closing tabs writes the text being typed first
   useEffect(() => {
@@ -262,7 +264,7 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
         overlay={(view) =>
           faces && (
             <>
-              <HighlightLayer view={view} ht={ht} tool={tt.tool} client={client} />
+              <HighlightLayer view={view} ht={ht} tool={tt.tool} client={client} overText={overText} />
               <TextLayer
                 view={view}
                 tt={tt}
@@ -282,6 +284,7 @@ export function DocumentView({ tab, toolbarStart, notice }: Props) {
                   )
                 }
                 onBackgroundDoubleClick={(pt) => ts.selectWord([pt.x, pt.y])}
+                overText={overText}
               />
               <SelectionLayer ts={ts} scale={view.scale} />
             </>

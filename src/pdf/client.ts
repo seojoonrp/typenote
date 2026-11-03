@@ -90,6 +90,11 @@ export class PdfClient {
     return this.send<SelectTextResult>({ kind: "selectText", ...params }).promise;
   }
 
+  /** Boxes of the page's text lines (page space), where text can be selected. */
+  textLines(page: number): Promise<[number, number, number, number][]> {
+    return this.send<[number, number, number, number][]>({ kind: "textLines", page }).promise;
+  }
+
   /** The page text of the same selection as `selectText`, for the clipboard. */
   copyText(params: SelectTextParams): Promise<string> {
     return this.send<string>({ kind: "copyText", ...params }).promise;

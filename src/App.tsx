@@ -5,7 +5,7 @@ import { DocumentView, initialView } from "./DocumentView";
 import { pathKey, Tabs, type Tab } from "./doc/Tabs";
 import { PdfError } from "./pdf/client";
 import type { TextBoxInput } from "./pdf/engine/model";
-import { baseName, platform, type OpenedFile } from "./platform";
+import { baseName, platform, type ChosenFile, type OpenedFile } from "./platform";
 import { Icon } from "./ui/Icon";
 import { LogoMark } from "./ui/Logo";
 import { Menu } from "./ui/Menu";
@@ -81,13 +81,28 @@ export function App() {
 
   const openPath = useCallback((path: string) => openLoaded(() => platform.readPath(path), path), [openLoaded]);
 
+  // one after another, so the tabs come in order
+  const openQueue = useRef<Promise<void>>(Promise.resolve());
+  const enqueue = useCallback((open: () => Promise<void>) => {
+    openQueue.current = openQueue.current.then(open);
+  }, []);
+
+  /** Several files at once: a tab each, in file name order. */
+  const openChosen = useCallback(
+    (files: ChosenFile[]) => {
+      const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+      for (const f of sorted) enqueue(() => openLoaded(f.load, f.path));
+    },
+    [enqueue, openLoaded],
+  );
+
   const pick = useCallback(async () => {
-    const file = await platform.pickPdf().catch((e: unknown) => {
+    const files = await platform.pickPdfs().catch((e: unknown) => {
       setError(String(e));
-      return null;
+      return [];
     });
-    if (file) void openLoaded(async () => file, file.path);
-  }, [openLoaded]);
+    openChosen(files);
+  }, [openChosen]);
 
   const closeTab = useCallback(
     async (tab: Tab) => {
@@ -101,16 +116,8 @@ export function App() {
   useEffect(() => {
     void platform.recentFiles().then(setRecent);
   }, []);
-  // one after another, so the tabs come in the order the files were given
-  const openQueue = useRef<Promise<void>>(Promise.resolve());
-  useEffect(
-    () =>
-      platform.onOpenRequest((p) => {
-        openQueue.current = openQueue.current.then(() => openPath(p));
-      }),
-    [openPath],
-  );
-  useEffect(() => platform.onFileDrop((load, path) => void openLoaded(load, path)), [openLoaded]);
+  useEffect(() => platform.onOpenRequest((p) => enqueue(() => openPath(p))), [openPath, enqueue]);
+  useEffect(() => platform.onFileDrop(openChosen), [openChosen]);
   useEffect(
     () =>
       platform.onCloseRequested(() => {
@@ -150,7 +157,8 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [tabs, pick, closeTab]);
 
-  // development hook for scripted checks (tools/): window.__typenote.store (the shown tab's), openPath()
+  // development hook for scripted checks (tools/): window.__typenote.store (the shown tab's), openPath(),
+  // openPaths() (several at once, as from the dialog or a drop)
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as { __typenote: unknown }).__typenote = {
@@ -159,12 +167,13 @@ export function App() {
         return tabs.active?.store ?? null;
       },
       openPath,
+      openPaths: (paths: string[]) => openChosen(paths.map((p) => ({ name: baseName(p), path: p, load: () => platform.readPath(p) }))),
       addTestBox: (patch: Partial<TextBoxInput> = {}) => {
         const t = tabs.active;
         return t?.store.putTextBox({ page: t.view.page, x: 60, y: 60, text: "테스트 상자 Test 123\n둘째 줄", size: 14, weight: "regular", color: [0.1, 0.2, 0.8], ...patch });
       },
     };
-  }, [tabs, openPath]);
+  }, [tabs, openPath, openChosen]);
 
   const recentItem = (p: string) => (
     <button key={p} onClick={() => void openPath(p)} title={p}>
@@ -198,7 +207,14 @@ export function App() {
   return (
     <div className="app">
       {list.length > 0 && (
-        <TabBar tabs={list} activeId={activeId} onActivate={(t) => tabs.activate(t.id)} onClose={(t) => void closeTab(t)} onOpen={() => void pick()} />
+        <TabBar
+          tabs={list}
+          activeId={activeId}
+          onActivate={(t) => tabs.activate(t.id)}
+          onClose={(t) => void closeTab(t)}
+          onMove={(t, i) => tabs.move(t.id, i)}
+          onOpen={() => void pick()}
+        />
       )}
       {active ? (
         <DocumentView key={active.id} tab={active} toolbarStart={toolbarStart} notice={notice} />

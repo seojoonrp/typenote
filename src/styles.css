@@ -190,7 +190,7 @@ button.primary kbd {
 .menu-list::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 6px;
-  background: var(--bg-5) padding-box;
+  background: #56607c padding-box;
 }
 
 .start::-webkit-scrollbar-track,
@@ -247,6 +247,13 @@ button.primary kbd {
 .tab:hover {
   color: var(--text-2);
   background: rgb(255 255 255 / 0.035);
+}
+
+.tab.dragging {
+  z-index: 2;
+  color: var(--text);
+  background: var(--bg-3);
+  box-shadow: var(--shadow-pop);
 }
 
 .tab.active {
@@ -734,11 +741,11 @@ button.primary kbd {
 .scroller::-webkit-scrollbar-thumb {
   border: 3px solid var(--bg-1);
   border-radius: 6px;
-  background: var(--bg-5);
+  background: #56607c;
 }
 
 .scroller::-webkit-scrollbar-thumb:hover {
-  background: #434b63;
+  background: #7480a1;
 }
 
 .scroller::-webkit-scrollbar-corner {
@@ -748,7 +755,7 @@ button.primary kbd {
 .docbar {
   position: relative;
   flex-shrink: 0;
-  width: 14px;
+  width: 16px;
   background: var(--bg-1);
   border-left: 1px solid var(--line);
   user-select: none;
@@ -759,12 +766,12 @@ button.primary kbd {
   left: 3px;
   right: 3px;
   border-radius: 4px;
-  background: var(--bg-5);
+  background: #56607c;
   transition: background-color 0.12s;
 }
 
 .docbar-thumb:hover {
-  background: #434b63;
+  background: #7480a1;
 }
 
 .docbar-thumb.dragging {
@@ -1127,9 +1134,10 @@ button.primary kbd {
   pointer-events: none;
 }
 
+/* the cursor is an I-beam only over text lines (set as the pointer moves) */
 .hl-layer.tool-highlight {
   pointer-events: auto;
-  cursor: text;
+  cursor: default;
   user-select: none;
 }
 

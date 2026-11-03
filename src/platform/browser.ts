@@ -1,7 +1,7 @@
 // Development fallback so the UI runs in a plain browser (vite dev): file picker,
 // HTML drag & drop, and ?file=/samples/x.pdf for loading a file served by the dev server.
 // Saving cannot reach the disk here: written bytes are kept in window.__typenoteSaved.
-import { baseName, isPdfName, type OpenedFile, type Platform } from "./types";
+import { baseName, isPdfName, type ChosenFile, type OpenedFile, type Platform } from "./types";
 
 declare global {
   interface Window {
@@ -33,17 +33,17 @@ async function fromFile(file: File): Promise<OpenedFile> {
   return { name: file.name, path: null, bytes: new Uint8Array(await file.arrayBuffer()), stamp: null };
 }
 
+const chosenFile = (file: File): ChosenFile => ({ name: file.name, path: null, load: () => fromFile(file) });
+
 export const browserPlatform: Platform = {
-  pickPdf() {
+  pickPdfs() {
     return new Promise((resolve) => {
       const input = document.createElement("input");
       input.type = "file";
+      input.multiple = true;
       input.accept = "application/pdf,.pdf";
-      input.addEventListener("change", () => {
-        const file = input.files?.[0];
-        resolve(file ? fromFile(file) : null);
-      });
-      input.addEventListener("cancel", () => resolve(null));
+      input.addEventListener("change", () => resolve([...(input.files ?? [])].map(chosenFile)));
+      input.addEventListener("cancel", () => resolve([]));
       input.click();
     });
   },
@@ -91,8 +91,8 @@ export const browserPlatform: Platform = {
     const over = (e: DragEvent) => e.preventDefault();
     const drop = (e: DragEvent) => {
       e.preventDefault();
-      const file = [...(e.dataTransfer?.files ?? [])].find((f) => isPdfName(f.name));
-      if (file) cb(() => fromFile(file), null);
+      const files = [...(e.dataTransfer?.files ?? [])].filter((f) => isPdfName(f.name)).map(chosenFile);
+      if (files.length) cb(files);
     };
     window.addEventListener("dragover", over);
     window.addEventListener("drop", drop);
